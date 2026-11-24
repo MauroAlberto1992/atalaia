@@ -1,0 +1,41 @@
+:root {
+  --bg: #0c1220;
+  --panel: rgba(15, 23, 42, 0.92);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --border: #1e293b;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--text);
+}
+html, body, #root { margin: 0; height: 100%; background: var(--bg); }
+.map { position: absolute; inset: 0; }
+
+.status {
+  position: absolute; top: 12px; left: 12px;
+  display: flex; gap: 8px; align-items: center;
+  padding: 8px 12px; font-size: 13px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+}
+.status .sep { color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.open { background: #22c55e; }
+.dot.connecting { background: #eab308; }
+.dot.closed { background: #ef4444; }
+
+.panel {
+  position: absolute; top: 12px; right: 12px; width: 280px;
+  max-width: calc(100% - 24px); box-sizing: border-box;
+  padding: 12px 14px; font-size: 13px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+}
+.panel header { display: flex; justify-content: space-between; align-items: center; }
+.panel h2 { margin: 0; font-size: 15px; }
+.panel button { background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; }
+.panel dl { margin: 10px 0 0; }
+.panel dl div { display: flex; justify-content: space-between; padding: 3px 0; border-top: 1px solid var(--border); }
+.panel dt { color: var(--muted); }
+.panel dd { margin: 0; }
+
+@media (max-width: 600px) {
+  .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; }
+}

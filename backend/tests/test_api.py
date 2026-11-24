@@ -45,3 +45,8 @@ def test_live_sends_snapshot_then_updates():
             client.portal.call(feed, app, event(2))
             update = ws.receive_json()
             assert update["type"] == "track" and update["track"]["mmsi"] == 2
+
+
+def test_area_is_null_without_ingestion():
+    with TestClient(create_app(ingest=False)) as client:
+        assert client.get("/area").json() is None

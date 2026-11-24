@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-from minicop.config import load_settings
+from minicop.config import Area, load_settings
 from minicop.events import PositionEvent, Track
 from minicop.hub import Hub
 from minicop.ingest import IngestStatus, run_ingestion
@@ -43,8 +43,10 @@ def create_app(ingest: bool = True) -> FastAPI:
         app.state.hub = Hub()
         app.state.status = IngestStatus()
         tasks = [asyncio.create_task(run_state(app.state.events, app.state.store, app.state.hub))]
+        app.state.area = None
         if ingest:
             settings = load_settings()  # fails fast if the API key is missing
+            app.state.area = settings.area
             tasks.append(asyncio.create_task(
                 run_ingestion(settings, app.state.events, app.state.status)
             ))
@@ -62,6 +64,11 @@ def create_app(ingest: bool = True) -> FastAPI:
             "tracks": len(app.state.store),
             "live_clients": len(app.state.hub),
         }
+
+    @app.get("/area")
+    async def area() -> Area | None:
+        """The configured area, so the map can frame it without hard-coding it."""
+        return app.state.area
 
     @app.get("/tracks")
     async def tracks() -> list[Track]:
