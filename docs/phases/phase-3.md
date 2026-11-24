@@ -39,7 +39,7 @@ cd backend && source .venv/bin/activate
 pip install -e ".[dev]"
 uvicorn minicop.api:app
 ```
-Terminal 2 (frontend, Node 20+):
+Terminal 2 (frontend, Node 22.12+ (Vite 8 needs >= 20.19)):
 ```bash
 cd frontend
 npm install

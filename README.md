@@ -19,7 +19,7 @@ python scripts/watch_positions.py   # phase 1 debug script: prints MMSI, lat, lo
 pytest
 ```
 
-Frontend (Node 20+), with the backend running:
+Frontend (Node 22.12+ (Vite 8 needs >= 20.19)), with the backend running:
 ```bash
 cd frontend
 npm install
