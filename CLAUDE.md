@@ -51,12 +51,16 @@ Prefer generic, sector-wide value over features tailored to one company.
 Keep company names out of user-facing text (README, UI); they live here only.
 
 ## Working rules
-- Plan before code: present the plan and wait for the user's OK.
+- Plan before code: write `docs/phases/phase-N-spec.md` (goal, scope, out of
+  scope, acceptance) and wait for the user's OK.
+- Guardrails must pass before every commit (`pre-commit`); never use `--no-verify`.
+- Any deviation from an approved spec is stated explicitly, with the reason.
 - Small steps. Do not add anything outside the current phase.
 - The user reads all the code: explain anything non-obvious.
 - Tests for the core logic (parsing, state).
 - At the end of each phase, write `docs/phases/phase-N.md` with what was done,
-  decisions taken, and how to run it.
+  decisions taken, how to run it, and "What the agent got wrong" (problem,
+  how it was caught, what changed). Add each lesson to "Lessons learned" below.
 - Code, comments and documentation in English (chat with the user in Portuguese).
 
 ## Phases
@@ -68,6 +72,7 @@ Keep company names out of user-facing text (README, UI); they live here only.
 4. Per-ship history: route, distance (haversine), average speed.
 5. Resilience (stale tracks, reconnection) and the whole coast.
 6. Zones and alerts.
+7. AI workflow and guardrails (see docs/ai-workflow.md).
 
 ## Layout
 ```
@@ -78,5 +83,19 @@ backend/
 docs/phases/          # one file per finished phase
 frontend/             # React + Zustand + MapLibre (phase 3+)
 
-Status: v1 complete (phases 0-6).
+Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow docs.
 ```
+
+## Lessons learned (from "What the agent got wrong")
+- Check the user's runtime versions (Python, Node) before choosing dependencies;
+  read the `engines` field of key packages and declare minimums.
+- Don't default to the newest major version; prefer what the tooling around it supports.
+- Measure external services before trusting library defaults (timeouts, first messages).
+- Build test fixtures from real captured data, not only from documentation.
+- Test data must be physically plausible (speeds, distances, times).
+- Verify UI changes in a real browser; passing tests and builds are not enough.
+- Logs for dropped data say where and include a truncated sample.
+- Geographic or domain data needs a source, or is labelled as demo in the UI itself.
+- Claims in docs (e.g. "precomputed") are checked against the code in review.
+- Declare every package the code imports; no reliance on transitive dependencies.
+- Kill old dev servers before testing; use strict ports.

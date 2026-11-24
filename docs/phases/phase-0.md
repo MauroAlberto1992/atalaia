@@ -12,3 +12,9 @@
 
 ## How to run
 Nothing to run yet.
+
+## What the agent got wrong
+
+| Problem | How it was caught | What changed |
+|---|---|---|
+| Picked TOML via stdlib `tomllib`, which needs Python 3.11, without checking the user's machine. | Phase 1: the user's Mac had Python 3.10 and setup failed. | Rule: check the user's runtime versions when choosing dependencies, and state minimum versions in the plan. |

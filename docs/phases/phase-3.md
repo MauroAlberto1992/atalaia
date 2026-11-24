@@ -46,3 +46,14 @@ npm install
 npm run dev        # open http://localhost:5173
 npm test
 ```
+
+## What the agent got wrong
+
+| Problem | How it was caught | What changed |
+|---|---|---|
+| Told the user "Node 20+". Vite 8 needs 20.19+, so `npm run dev` crashed on Node 20.11. | The user's run. | Read the `engines` field of key dependencies; declare it in `package.json`. |
+| MapLibre 6's web worker broke under Vite's dependency pre-bundling, so **no ships were drawn while all tests and the build passed**. | Agent's own headless-browser screenshot. | UI changes are verified in a real browser, not only by tests and `tsc`. |
+| Used `import maplibregl from "maplibre-gl"`, but v6 has no default export. | `tsc`. | Type checking stays mandatory (now enforced by pre-commit). |
+| Committed `tsconfig.tsbuildinfo`, a build artefact. | Agent review of `git status`. | `.gitignore` updated; reviewing the staged file list is part of every commit. |
+| Added `GET /area`, which was not in the approved plan. | Flagged by the agent in the phase summary. | Any deviation from an approved spec is stated explicitly and justified. |
+| Installed TypeScript 7 just because it was the latest. typescript-eslint doesn't support it. | Phase 7.1, when adding ESLint. | Prefer versions the surrounding tooling supports over "latest". |

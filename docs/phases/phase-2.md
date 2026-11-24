@@ -52,3 +52,9 @@ curl localhost:8000/tracks
 pytest
 ```
 To watch `/live`: `python -m websockets ws://localhost:8000/live`.
+
+## What the agent got wrong
+
+| Problem | How it was caught | What changed |
+|---|---|---|
+| A state test moved a ship 6 nm in 10 s. That passed then, but is physically impossible. | Phase 4: the new jump filter rejected it and the test failed. | Test data must be physically plausible (speeds, distances, times). |
