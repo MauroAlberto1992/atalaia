@@ -3,7 +3,7 @@
 ## Context
 Mini-COP: a live map of ships off the Portuguese coast, with zones and alerts.
 A small version of a "Common Operational Picture", built as a portfolio piece to
-show defence companies (e.g. TEKEVER, ATLAS platform) the ability to build
+show defence and security companies (e.g. TEKEVER, ATLAS platform) the ability to build
 real-time systems with maps and data fusion.
 
 ## v1 scope
@@ -37,14 +37,18 @@ The browser never connects to aisstream directly.
 - API key in `.env`, never in the repository.
 
 ## Target audience: keep it in mind
-The point of this project is to be relevant to TEKEVER (drones for maritime
-surveillance; the ATLAS platform fuses sensor data, AI and operator tools).
+The point of this project is to be relevant to defence and security companies
+(the user is applying to several; TEKEVER and its ATLAS platform is one example).
 When proposing features or priorities, always ask: does this show something
-they need? Their core needs are maritime domain awareness: detecting
-non-cooperative / "dark" vessels, fusing AIS with drone and satellite sensors,
-anomaly detection (loitering, rendezvous, going dark, spoofing, illegal
-fishing), and helping operators decide where to send assets.
-Keep the company name out of user-facing text (README, UI); it lives here only.
+these companies need? Common needs across the sector:
+- maritime / situational awareness: a reliable live picture from several sources;
+- detecting non-cooperative or "dark" targets;
+- sensor and data fusion (AIS + radar, satellite SAR, drone EO/IR);
+- anomaly detection (loitering, rendezvous, going dark, spoofing, illegal fishing);
+- decision support: helping operators decide where to send assets;
+- robustness: works with gaps, noise and bad data.
+Prefer generic, sector-wide value over features tailored to one company.
+Keep company names out of user-facing text (README, UI); they live here only.
 
 ## Working rules
 - Plan before code: present the plan and wait for the user's OK.
