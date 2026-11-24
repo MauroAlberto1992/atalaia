@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from minicop.api import create_app
 from minicop.events import PositionEvent, Tick
+from minicop.zones import Zone
 
 
 def event(mmsi: int, second: int = 0) -> PositionEvent:
@@ -78,3 +79,29 @@ def test_live_sends_stale_and_remove():
             assert ws.receive_json() == {"type": "stale", "mmsi": 1}
             client.portal.call(feed, app, Tick(now=t0 + timedelta(minutes=60)))
             assert ws.receive_json() == {"type": "remove", "mmsi": 1}
+
+
+ZONE = Zone(name="Z", kind="restricted", alert_on_entry=True,
+            polygon=[(36.9, -8.1), (36.9, -7.9), (37.1, -7.9), (37.1, -8.1)])
+
+
+def test_zones_endpoint():
+    with TestClient(create_app(ingest=False, zones=[ZONE])) as client:
+        zones = client.get("/zones").json()
+        assert zones[0]["name"] == "Z"
+        assert zones[0]["bbox"] == [[36.9, -8.1], [37.1, -7.9]]
+
+
+def test_alert_on_live_and_in_alerts_endpoint():
+    app = create_app(ingest=False, zones=[ZONE])
+    with TestClient(app) as client:
+        with client.websocket_connect("/live") as ws:
+            assert ws.receive_json()["alerts"] == []  # snapshot
+            client.portal.call(feed, app, event(1))  # at 37.0, -8.0: inside Z
+            assert ws.receive_json()["type"] == "track"
+            msg = ws.receive_json()
+            assert msg["type"] == "alert" and msg["alert"]["kind"] == "enter"
+        assert client.get("/alerts").json()[0]["zone"] == "Z"
+        # A new client gets the alert in its snapshot.
+        with client.websocket_connect("/live") as ws:
+            assert len(ws.receive_json()["alerts"]) == 1

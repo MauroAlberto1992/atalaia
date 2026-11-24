@@ -1,11 +1,16 @@
 import { create } from "zustand";
-import type { ConnectionState, LiveMessage, LngLat, Track } from "./types";
+import type { Alert, ConnectionState, LiveMessage, LngLat, Track } from "./types";
+
+const MAX_ALERTS = 200; // same bound as the backend
 
 export interface TrackState {
   tracks: Record<number, Track>; // keyed by MMSI
   connection: ConnectionState;
   selected: number | null;
   route: LngLat[]; // route of the selected ship only
+  alerts: Alert[]; // newest first
+  unseen: number; // alerts received live since the user last looked
+  focus: LngLat | null; // map flies here when this changes (new array = new request)
 }
 
 // Pure reducer: given a /live message, return the new tracks map.
@@ -15,6 +20,7 @@ export function reduceLive(tracks: Record<number, Track>, msg: LiveMessage): Rec
     // A snapshot replaces everything (also after a reconnect).
     return Object.fromEntries(msg.tracks.map((t) => [t.mmsi, t]));
   }
+  if (msg.type === "alert") return tracks;
   if (msg.type === "stale") {
     const t = tracks[msg.mmsi];
     return t ? { ...tracks, [msg.mmsi]: { ...t, stale: true } } : tracks;
@@ -26,6 +32,13 @@ export function reduceLive(tracks: Record<number, Track>, msg: LiveMessage): Rec
   }
   // New object so React/Zustand see a change.
   return { ...tracks, [msg.track.mmsi]: msg.track };
+}
+
+// Pure: alerts list after a /live message (newest first, bounded).
+export function reduceAlerts(alerts: Alert[], msg: LiveMessage): Alert[] {
+  if (msg.type === "snapshot") return msg.alerts;
+  if (msg.type === "alert") return [msg.alert, ...alerts].slice(0, MAX_ALERTS);
+  return alerts;
 }
 
 // Pure: extend a route with a ship's latest position, unless it hasn't moved.
@@ -40,6 +53,8 @@ interface TrackActions {
   applyLive: (msg: LiveMessage) => void;
   setConnection: (c: ConnectionState) => void;
   select: (mmsi: number | null) => void;
+  focusAlert: (alert: Alert) => void;
+  markSeen: () => void;
 }
 
 export const useTrackStore = create<TrackState & TrackActions>()((set, get) => ({
@@ -47,20 +62,37 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
   connection: "connecting",
   selected: null,
   route: [],
+  alerts: [],
+  unseen: 0,
+  focus: null,
 
   applyLive: (msg) =>
     set((s) => {
       const tracks = reduceLive(s.tracks, msg);
+      const alerts = reduceAlerts(s.alerts, msg);
+      const unseen = msg.type === "alert" ? s.unseen + 1 : s.unseen;
       // The selected ship may be gone (removed, or missing from a new snapshot).
-      if (s.selected !== null && !(s.selected in tracks)) return { tracks, selected: null, route: [] };
+      if (s.selected !== null && !(s.selected in tracks))
+        return { tracks, alerts, unseen, selected: null, route: [] };
       return {
         tracks,
+        alerts,
+        unseen,
         route:
           msg.type === "track" && msg.track.mmsi === s.selected ? appendRoute(s.route, msg.track) : s.route,
       };
     }),
 
   setConnection: (connection) => set({ connection }),
+
+  markSeen: () => set({ unseen: 0 }),
+
+  focusAlert: (alert) => {
+    const t = get().tracks[alert.mmsi];
+    if (!t) return; // ship already removed: nothing to show
+    get().select(alert.mmsi);
+    set({ focus: [t.longitude, t.latitude] });
+  },
 
   select: (mmsi) => {
     set({ selected: mmsi, route: [] });

@@ -76,6 +76,9 @@ class TrackStore:
                 result.stale.append(mmsi)
         return result
 
+    def get(self, mmsi: int) -> Track | None:
+        return self._tracks.get(mmsi)
+
     def history(self, mmsi: int) -> ShipHistory | None:
         return self._history.get(mmsi)
 

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { AlertPanel } from "./AlertPanel";
 import { connectLive } from "./live";
 import { MapView } from "./MapView";
 import { ShipPanel } from "./ShipPanel";
@@ -11,6 +12,7 @@ export function App() {
       <MapView />
       <StatusBar />
       <ShipPanel />
+      <AlertPanel />
     </>
   );
 }

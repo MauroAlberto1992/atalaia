@@ -24,7 +24,9 @@ One always-on process, event-driven internally (asyncio queues, no broker):
    Flags ships that stopped transmitting (stale after 10 min, removed after 60 min),
    driven by a clock Tick on the same queue.
    Hub: fans out changes to WebSocket clients, dropping slow ones.
-3. API: `GET /tracks` (current snapshot) and `WS /live` (real-time changes).
+   AlertEngine (zones from `backend/config/zones.toml`) runs in the same state task.
+3. API: `GET /tracks` (current snapshot) and `WS /live` (real-time changes),
+   plus `/tracks/{mmsi}/history`, `/zones`, `/alerts`, `/area`, `/health`.
 The browser never connects to aisstream directly.
 
 ## aisstream gotchas
@@ -60,5 +62,7 @@ backend/
   src/minicop/        # Python package
   tests/              # pytest
 docs/phases/          # one file per finished phase
-frontend/             # created in phase 3
+frontend/             # React + Zustand + MapLibre (phase 3+)
+
+Status: v1 complete (phases 0-6).
 ```
