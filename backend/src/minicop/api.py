@@ -8,10 +8,12 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 from minicop.config import Area, load_settings
 from minicop.events import PositionEvent, Track
+from minicop.history import HistoryPoint, HistoryStats
 from minicop.hub import Hub
 from minicop.ingest import IngestStatus, run_ingestion
 from minicop.state import TrackStore
@@ -19,6 +21,12 @@ from minicop.state import TrackStore
 log = logging.getLogger(__name__)
 
 EVENT_QUEUE_SIZE = 10_000
+
+
+class HistoryResponse(BaseModel):
+    mmsi: int
+    points: list[HistoryPoint]
+    stats: HistoryStats
 
 
 async def run_state(events: asyncio.Queue[PositionEvent], store: TrackStore, hub: Hub) -> None:
@@ -73,6 +81,13 @@ def create_app(ingest: bool = True) -> FastAPI:
     @app.get("/tracks")
     async def tracks() -> list[Track]:
         return app.state.store.snapshot()
+
+    @app.get("/tracks/{mmsi}/history")
+    async def history(mmsi: int) -> HistoryResponse:
+        h = app.state.store.history(mmsi)
+        if h is None:
+            raise HTTPException(status_code=404, detail="Unknown MMSI")
+        return HistoryResponse(mmsi=mmsi, points=h.points(), stats=h.stats())
 
     @app.websocket("/live")
     async def live(ws: WebSocket) -> None:

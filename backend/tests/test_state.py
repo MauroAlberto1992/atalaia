@@ -23,7 +23,7 @@ def test_new_ship_creates_track():
 def test_newer_report_updates_track():
     store = TrackStore()
     store.apply(event())
-    track = store.apply(event(lat=37.1, at=T0 + timedelta(seconds=10)))
+    track = store.apply(event(lat=37.1, at=T0 + timedelta(minutes=10)))  # 6 nm in 10 min
     assert track is not None and track.latitude == 37.1
     assert len(store) == 1
 
@@ -48,3 +48,25 @@ def test_ships_are_tracked_separately():
     store.apply(event(mmsi=1))
     store.apply(event(mmsi=2))
     assert {t.mmsi for t in store.snapshot()} == {1, 2}
+
+
+def test_track_carries_history_stats():
+    store = TrackStore()
+    store.apply(event(lat=37.0, at=T0))
+    track = store.apply(event(lat=37.0 + 1 / 60, at=T0 + timedelta(minutes=6)))
+    assert round(track.distance_nm, 2) == 1.0
+    assert round(track.avg_speed_kn) == 10
+
+
+def test_jump_does_not_move_the_track():
+    store = TrackStore()
+    store.apply(event(lat=37.0, at=T0))
+    assert store.apply(event(lat=38.0, at=T0 + timedelta(seconds=10))) is None
+    assert store.snapshot()[0].latitude == 37.0
+
+
+def test_jitter_still_updates_last_seen():
+    store = TrackStore()
+    store.apply(event(lat=37.0, at=T0))
+    track = store.apply(event(lat=37.0, at=T0 + timedelta(seconds=10)))
+    assert track is not None and track.last_seen == T0 + timedelta(seconds=10)

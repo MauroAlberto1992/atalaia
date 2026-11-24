@@ -21,7 +21,8 @@ class PositionEvent(BaseModel):
 
 
 class Track(BaseModel):
-    """Latest known state of one ship. Phase 2: last position only."""
+    """Latest known state of one ship, plus route stats (phase 4).
+    The route points themselves are served separately by /tracks/{mmsi}/history."""
 
     mmsi: int
     ship_name: str
@@ -32,3 +33,5 @@ class Track(BaseModel):
     true_heading: int
     navigational_status: int
     last_seen: datetime
+    distance_nm: float = 0.0  # over the stored history
+    avg_speed_kn: float = 0.0

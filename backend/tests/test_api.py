@@ -50,3 +50,18 @@ def test_live_sends_snapshot_then_updates():
 def test_area_is_null_without_ingestion():
     with TestClient(create_app(ingest=False)) as client:
         assert client.get("/area").json() is None
+
+
+def test_history_endpoint():
+    app = create_app(ingest=False)
+    with TestClient(app) as client:
+        client.portal.call(feed, app, event(1, 0))
+        body = client.get("/tracks/1/history").json()
+        assert body["mmsi"] == 1
+        assert len(body["points"]) == 1
+        assert body["stats"]["distance_nm"] == 0.0
+
+
+def test_history_unknown_mmsi_is_404():
+    with TestClient(create_app(ingest=False)) as client:
+        assert client.get("/tracks/999/history").status_code == 404

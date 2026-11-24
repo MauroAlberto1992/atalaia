@@ -9,7 +9,12 @@ export interface Track {
   true_heading: number; // 511 = not available
   navigational_status: number;
   last_seen: string; // ISO 8601, UTC
+  distance_nm: number; // over the backend's stored history
+  avg_speed_kn: number;
 }
+
+// GeoJSON order: longitude first.
+export type LngLat = [number, number];
 
 // Messages sent by WS /live.
 export type LiveMessage =

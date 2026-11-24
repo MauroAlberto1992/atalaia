@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import { ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
 import { useTrackStore } from "./store";
-import type { Track } from "./types";
+import type { LngLat, Track } from "./types";
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark"; // free, no API key
 const STOPPED_KNOTS = 0.5; // below this, show a circle instead of an arrow
@@ -27,6 +27,15 @@ function toGeoJSON(tracks: Record<number, Track>): FeatureCollection {
       geometry: { type: "Point", coordinates: [t.longitude, t.latitude] }, // GeoJSON: lon first!
       properties: { mmsi: t.mmsi, icon: isMoving(t) ? "ship-moving" : "ship-stopped", cog: t.cog },
     })),
+  };
+}
+
+function routeGeoJSON(route: LngLat[]): FeatureCollection {
+  // A line needs at least two points; an empty collection draws nothing.
+  if (route.length < 2) return { type: "FeatureCollection", features: [] };
+  return {
+    type: "FeatureCollection",
+    features: [{ type: "Feature", geometry: { type: "LineString", coordinates: route }, properties: {} }],
   };
 }
 
@@ -56,6 +65,15 @@ export function MapView() {
       map.addImage("ship-moving", movingIcon(), { pixelRatio: ICON_PIXEL_RATIO });
       map.addImage("ship-stopped", stoppedIcon(), { pixelRatio: ICON_PIXEL_RATIO });
       map.addSource("ships", { type: "geojson", data: toGeoJSON(useTrackStore.getState().tracks) });
+      // Route of the selected ship, drawn under the ship icons.
+      map.addSource("route", { type: "geojson", data: routeGeoJSON([]) });
+      map.addLayer({
+        id: "route",
+        type: "line",
+        source: "route",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#facc15", "line-width": 2, "line-opacity": 0.8 },
+      });
       map.addLayer({
         id: "selected-ring",
         type: "circle",
@@ -84,8 +102,9 @@ export function MapView() {
       // Push store changes into the map. subscribe() runs outside React's
       // render cycle: the map is updated directly, nothing re-renders.
       const sync = () => {
-        const { tracks, selected } = useTrackStore.getState();
+        const { tracks, selected, route } = useTrackStore.getState();
         (map.getSource("ships") as GeoJSONSource).setData(toGeoJSON(tracks));
+        (map.getSource("route") as GeoJSONSource).setData(routeGeoJSON(route));
         map.setFilter("selected-ring", ["==", ["get", "mmsi"], selected ?? -1]);
       };
       sync();
