@@ -62,6 +62,37 @@ npm test
 Areas are configured in `backend/config/areas.toml` and zones in
 `backend/config/zones.toml`. Coordinates there are `[lat, lon]`, latitude first.
 
+## Ideas for next steps
+Not planned yet; candidates for a v2.
+
+### Run it anywhere: Docker
+- A `docker compose up` with two services: the backend (uvicorn), and the frontend built and served by nginx.
+- nginx also proxies `/api` and `/live`, as Vite does in development.
+- The API key is passed as an environment variable, never baked into the image.
+
+### Persistence: a database
+- **PostgreSQL + PostGIS** (or TimescaleDB) for positions, tracks and alerts.
+- History survives restarts and is no longer capped at 2000 points per ship.
+- Replay a past time window on the map ("what happened here last night?").
+- Zone checks can move to SQL (`ST_Contains`) once there are many zones.
+
+### Analytics without AI
+- **Fishing hotspots.** Use a grid heatmap of positions from ships reporting status 7 ("fishing"), or moving slowly in a fishing pattern, aggregated by season and time of day.
+  This is plain counting, with no model needed.
+- **Traffic density and lanes.** The same kind of heatmap over all ships shows the shipping lanes.
+- **Port calls.** Moored or anchored periods near ports give arrival and departure times and dwell times.
+
+### Ideas using AI / ML
+- **Route prediction.** Start with a baseline that extrapolates the current course and speed (dead reckoning).
+  A model trained on past tracks could then predict where a ship will be in 30–60 minutes, and its likely destination.
+- **Anomaly detection.** Flag behaviour that doesn't fit the ship's usual pattern:
+  - loitering;
+  - two ships meeting at sea (possible ship-to-ship transfer);
+  - repeated "going dark" in the same place;
+  - positions that jump in ways that suggest AIS spoofing.
+- **Vessel type from movement.** Classify a ship from how it moves (fishing vs. cargo vs. leisure) when its declared type is missing or doesn't match.
+- **Natural-language operator assistant.** An LLM over the live picture and the alerts could answer questions like "which ships went dark near Sagres today?" or write a shift summary.
+
 ## How it was built
 In phases, each with a plan, tests and a write-up of the decisions in
 [`docs/phases/`](docs/phases): data exploration, service, map, history,
