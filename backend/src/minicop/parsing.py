@@ -22,7 +22,9 @@ def parse_position(raw: str | bytes) -> PositionReport | None:
     except ValidationError as exc:  # also covers malformed JSON
         err = exc.errors()[0]
         # loc is the path to the bad field, e.g. ('MetaData', 'time_utc').
-        log.warning("Dropping invalid frame: %s at %s", err["msg"], err["loc"])
+        log.warning(
+            "Dropping invalid frame: %s at %s | frame: %.200s", err["msg"], err["loc"], raw
+        )
         return None
 
     if envelope.message_type != "PositionReport":
