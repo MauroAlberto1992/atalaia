@@ -16,11 +16,13 @@ real-time systems with maps and data fusion.
 - Backend: Python, FastAPI + asyncio, Pydantic.
 - Frontend (from phase 3 only): React + Zustand + MapLibre.
 
-## Architecture (proposal, finalised in phase 2)
+## Architecture (finalised in phase 2, see docs/phases/phase-2.md)
 One always-on process, event-driven internally (asyncio queues, no broker):
 1. Ingestion: task connected to aisstream with automatic reconnection.
    Converts each message into an event.
-2. State: sole owner of the MMSI -> Track map. Flags ships that stopped transmitting.
+2. State: sole owner of the MMSI -> Track map (single writer task).
+   Flags ships that stopped transmitting (phase 5).
+   Hub: fans out changes to WebSocket clients, dropping slow ones.
 3. API: `GET /tracks` (current snapshot) and `WS /live` (real-time changes).
 The browser never connects to aisstream directly.
 

@@ -10,7 +10,7 @@ import logging
 
 from websockets.asyncio.client import connect
 
-from minicop.config import load_settings
+from minicop.config import ConfigError, load_settings
 from minicop.parsing import parse_position
 
 AISSTREAM_URL = "wss://stream.aisstream.io/v0/stream"
@@ -52,3 +52,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         pass
+    except ConfigError as exc:
+        raise SystemExit(f"Config error: {exc}")
