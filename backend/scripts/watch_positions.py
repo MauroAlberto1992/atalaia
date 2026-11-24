@@ -26,7 +26,8 @@ async def main() -> None:
 
     # compression="deflate" is websockets' default; set explicitly because
     # aisstream limits uncompressed connections.
-    async with connect(AISSTREAM_URL, compression="deflate") as ws:
+    # open_timeout: aisstream's handshake can take >10 s (websockets' default).
+    async with connect(AISSTREAM_URL, compression="deflate", open_timeout=30) as ws:
         # Must be the first thing sent, within 3 s of connecting.
         await ws.send(json.dumps(subscription))
         print(f"Subscribed to area '{settings.area.name}'. Waiting for ships...")

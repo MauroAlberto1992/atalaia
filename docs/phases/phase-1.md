@@ -13,6 +13,7 @@
 - **Two-step validation.** The envelope is validated first; the inner message is validated only if the type is `PositionReport`. This keeps the code easy to extend to other message types later.
 - **Position validity.** Coordinates must be within the lat/lon range, which also rejects AIS "not available" values (91/181).
 - **`time_utc` kept as a string.** aisstream uses a Go-style timestamp format; we will parse it in phase 2, when the state needs it.
+- **`open_timeout=30`**: the aisstream handshake was observed taking ~13 s, over the 10 s websockets default.
 - **No reconnection.** The script exits if the connection drops. Reconnection belongs to the service (phase 2/5).
 - **Server-side filter.** `FilterMessageTypes: ["PositionReport"]` asks aisstream to send only positions, which saves bandwidth.
 - **Compression.** `compression="deflate"` (permessage-deflate) is set explicitly, even though it is the websockets default.
