@@ -7,7 +7,9 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import cast
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -26,6 +28,9 @@ log = logging.getLogger(__name__)
 EVENT_QUEUE_SIZE = 10_000
 SWEEP_INTERVAL_S = 30
 
+# Positions from ingestion and clock ticks share one queue (single writer).
+EventQueue = asyncio.Queue[PositionEvent | Tick]
+
 
 class HistoryResponse(BaseModel):
     mmsi: int
@@ -33,9 +38,7 @@ class HistoryResponse(BaseModel):
     stats: HistoryStats
 
 
-async def run_state(
-    events: asyncio.Queue[PositionEvent | Tick], store: TrackStore, engine: AlertEngine, hub: Hub
-) -> None:
+async def run_state(events: EventQueue, store: TrackStore, engine: AlertEngine, hub: Hub) -> None:
     """The only task that mutates the store and the alert engine.
     Publishes every change to the hub."""
 
@@ -67,36 +70,52 @@ async def run_state(
             events.task_done()  # lets tests await events.join()
 
 
-async def run_clock(events: asyncio.Queue[PositionEvent | Tick]) -> None:
+async def run_clock(events: EventQueue) -> None:
     """Puts a Tick on the event queue every SWEEP_INTERVAL_S."""
     while True:
         await asyncio.sleep(SWEEP_INTERVAL_S)
-        await events.put(Tick(now=datetime.now(timezone.utc)))
+        await events.put(Tick(now=datetime.now(UTC)))
+
+
+@dataclass
+class Runtime:
+    """Everything the running service holds, created in the lifespan.
+
+    Kept in one typed object instead of loose attributes on app.state
+    (which Starlette types as Any), so mypy checks every use.
+    """
+
+    events: EventQueue
+    store: TrackStore
+    hub: Hub
+    alerts: AlertEngine
+    status: IngestStatus
+    area: Area | None
 
 
 def create_app(ingest: bool = True, zones: list[Zone] | None = None) -> FastAPI:
-    """ingest=False skips aisstream (and the API key); tests feed app.state.events.
-    zones defaults to config/zones.toml; tests pass their own."""
+    """ingest=False skips aisstream (and the API key); tests feed
+    app.state.runtime.events. zones defaults to config/zones.toml; tests pass their own."""
     zone_list = load_zones() if zones is None else zones
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        app.state.events = asyncio.Queue(maxsize=EVENT_QUEUE_SIZE)
-        app.state.store = TrackStore()
-        app.state.hub = Hub()
-        app.state.alerts = AlertEngine(zone_list)
-        app.state.status = IngestStatus()
+        settings = load_settings() if ingest else None  # fails fast if the API key is missing
+        rt = Runtime(
+            events=asyncio.Queue(maxsize=EVENT_QUEUE_SIZE),
+            store=TrackStore(),
+            hub=Hub(),
+            alerts=AlertEngine(zone_list),
+            status=IngestStatus(),
+            area=settings.area if settings else None,
+        )
+        app.state.runtime = rt
         tasks = [
-            asyncio.create_task(run_state(app.state.events, app.state.store, app.state.alerts, app.state.hub)),
-            asyncio.create_task(run_clock(app.state.events)),
+            asyncio.create_task(run_state(rt.events, rt.store, rt.alerts, rt.hub)),
+            asyncio.create_task(run_clock(rt.events)),
         ]
-        app.state.area = None
-        if ingest:
-            settings = load_settings()  # fails fast if the API key is missing
-            app.state.area = settings.area
-            tasks.append(asyncio.create_task(
-                run_ingestion(settings, app.state.events, app.state.status)
-            ))
+        if settings:
+            tasks.append(asyncio.create_task(run_ingestion(settings, rt.events, rt.status)))
         yield
         for task in tasks:
             task.cancel()
@@ -104,20 +123,24 @@ def create_app(ingest: bool = True, zones: list[Zone] | None = None) -> FastAPI:
 
     app = FastAPI(title="Mini-COP", lifespan=lifespan)
 
+    def runtime() -> Runtime:
+        return cast(Runtime, app.state.runtime)
+
     @app.get("/health")
-    async def health() -> dict:
+    async def health() -> dict[str, object]:
+        rt = runtime()
         return {
-            "aisstream_connected": app.state.status.connected,
-            "last_message_at": app.state.status.last_message_at,
-            "reconnects": app.state.status.reconnects,
-            "tracks": len(app.state.store),
-            "live_clients": len(app.state.hub),
+            "aisstream_connected": rt.status.connected,
+            "last_message_at": rt.status.last_message_at,
+            "reconnects": rt.status.reconnects,
+            "tracks": len(rt.store),
+            "live_clients": len(rt.hub),
         }
 
     @app.get("/area")
     async def area() -> Area | None:
         """The configured area, so the map can frame it without hard-coding it."""
-        return app.state.area
+        return runtime().area
 
     @app.get("/zones")
     async def zones_() -> list[Zone]:
@@ -126,29 +149,30 @@ def create_app(ingest: bool = True, zones: list[Zone] | None = None) -> FastAPI:
     @app.get("/alerts")
     async def alerts() -> list[Alert]:
         """Most recent alerts (up to 200), newest first."""
-        return app.state.alerts.recent()
+        return runtime().alerts.recent()
 
     @app.get("/tracks")
     async def tracks() -> list[Track]:
-        return app.state.store.snapshot()
+        return runtime().store.snapshot()
 
     @app.get("/tracks/{mmsi}/history")
     async def history(mmsi: int) -> HistoryResponse:
-        h = app.state.store.history(mmsi)
+        h = runtime().store.history(mmsi)
         if h is None:
             raise HTTPException(status_code=404, detail="Unknown MMSI")
         return HistoryResponse(mmsi=mmsi, points=h.points(), stats=h.stats())
 
     @app.websocket("/live")
     async def live(ws: WebSocket) -> None:
+        rt = runtime()
         await ws.accept()
         # Subscribe and take the snapshot with no await in between: both run in
         # one step of the event loop, so no update can fall into a gap.
-        queue = app.state.hub.subscribe()
+        queue = rt.hub.subscribe()
         snapshot = {
             "type": "snapshot",
-            "tracks": [t.model_dump(mode="json") for t in app.state.store.snapshot()],
-            "alerts": [a.model_dump(mode="json") for a in app.state.alerts.recent()],
+            "tracks": [t.model_dump(mode="json") for t in rt.store.snapshot()],
+            "alerts": [a.model_dump(mode="json") for a in rt.alerts.recent()],
         }
         try:
             await ws.send_json(snapshot)
@@ -158,7 +182,7 @@ def create_app(ingest: bool = True, zones: list[Zone] | None = None) -> FastAPI:
         except WebSocketDisconnect:
             pass
         finally:
-            app.state.hub.unsubscribe(queue)
+            rt.hub.unsubscribe(queue)
 
     return app
 

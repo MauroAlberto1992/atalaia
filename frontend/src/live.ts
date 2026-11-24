@@ -17,7 +17,9 @@ export function connectLive(): () => void {
     const scheme = location.protocol === "https:" ? "wss" : "ws";
     ws = new WebSocket(`${scheme}://${location.host}/live`);
     ws.onopen = () => setConnection("open");
-    ws.onmessage = (e) => applyLive(JSON.parse(e.data) as LiveMessage);
+    // Trusted source (our own backend), so no runtime schema validation;
+    // the cast is the contract with backend/src/minicop/api.py.
+    ws.onmessage = (e: MessageEvent<string>) => applyLive(JSON.parse(e.data) as LiveMessage);
     ws.onclose = () => {
       setConnection("closed");
       if (!stopped) retryTimer = window.setTimeout(open, RECONNECT_DELAY_MS);

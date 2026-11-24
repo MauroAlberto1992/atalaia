@@ -15,7 +15,8 @@ def test_jitter_stays_between_half_and_full():
 
 def test_reset_starts_again():
     b = Backoff(base=1, cap=60, rand=lambda: 1.0)
-    b.next(); b.next(); b.next()
+    for _ in range(3):
+        b.next()
     b.reset()
     assert b.next() == 1
 
@@ -23,6 +24,7 @@ def test_reset_starts_again():
 @pytest.mark.parametrize("seed", range(20))
 def test_random_delays_in_range(seed):
     import random
+
     rng = random.Random(seed)
     b = Backoff(base=1, cap=60, rand=rng.random)
     for attempt in range(10):

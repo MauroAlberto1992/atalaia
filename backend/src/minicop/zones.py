@@ -2,8 +2,9 @@
 
 import tomllib
 from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, PrivateAttr, computed_field
 
 from minicop.config import BACKEND_DIR, Corner
 from minicop.geo import point_in_polygon
@@ -18,12 +19,21 @@ class Zone(BaseModel):
     max_speed_kn: float | None = None
     polygon: list[Corner] = Field(min_length=3)  # [lat, lon] vertices
 
-    @computed_field  # included in the JSON for the frontend
-    @property
-    def bbox(self) -> tuple[Corner, Corner]:
+    _bbox: tuple[Corner, Corner] = PrivateAttr()
+
+    def model_post_init(self, context: Any, /) -> None:
+        # Computed once here, not on every contains() call (which runs for
+        # every zone on every position report).
         lats = [p[0] for p in self.polygon]
         lons = [p[1] for p in self.polygon]
-        return (min(lats), min(lons)), (max(lats), max(lons))
+        self._bbox = (min(lats), min(lons)), (max(lats), max(lons))
+
+    # mypy doesn't understand decorators stacked on @property; this is the
+    # pattern Pydantic documents, so the ignore is expected.
+    @computed_field  # type: ignore[prop-decorator]  # included in the JSON
+    @property
+    def bbox(self) -> tuple[Corner, Corner]:
+        return self._bbox
 
     def contains(self, lat: float, lon: float) -> bool:
         # Cheap rectangle check first; most ships are far from most zones.

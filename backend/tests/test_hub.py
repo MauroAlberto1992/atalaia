@@ -1,5 +1,3 @@
-import asyncio
-
 from minicop import hub as hub_module
 from minicop.hub import Hub
 

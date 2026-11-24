@@ -5,6 +5,8 @@ snake_case attributes and map them with `alias`, so the rest of the code
 never sees the wire names.
 """
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -19,7 +21,8 @@ class PositionReport(BaseModel):
     sog: float = Field(alias="Sog")  # speed over ground, knots
     cog: float = Field(alias="Cog")  # course over ground, degrees
     true_heading: int = Field(alias="TrueHeading")  # bow direction; 511 = not available
-    navigational_status: int = Field(alias="NavigationalStatus")  # 0 under way, 1 anchored, 5 moored...
+    # 0 under way, 1 anchored, 5 moored, 7 fishing...
+    navigational_status: int = Field(alias="NavigationalStatus")
     timestamp: int = Field(alias="Timestamp")  # UTC second of the minute (0-59)
 
 
@@ -39,4 +42,4 @@ class AisEnvelope(BaseModel):
     message_type: str = Field(alias="MessageType")
     # Control messages (e.g. SubscriptionConfirmation) have no MetaData.
     metadata: MetaData | None = Field(default=None, alias="MetaData")
-    message: dict = Field(alias="Message")  # e.g. {"PositionReport": {...}}
+    message: dict[str, Any] = Field(alias="Message")  # e.g. {"PositionReport": {...}}

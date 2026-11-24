@@ -1,15 +1,22 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from minicop.events import PositionEvent
 from minicop.state import TrackStore
 
-T0 = datetime(2026, 11, 24, 12, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
 
 
 def event(mmsi=263123456, lat=37.0, lon=-8.0, at=T0, name="SHIP") -> PositionEvent:
     return PositionEvent(
-        mmsi=mmsi, latitude=lat, longitude=lon, sog=10.0, cog=90.0, true_heading=90,
-        navigational_status=0, ship_name=name, received_at=at,
+        mmsi=mmsi,
+        latitude=lat,
+        longitude=lon,
+        sog=10.0,
+        cog=90.0,
+        true_heading=90,
+        navigational_status=0,
+        ship_name=name,
+        received_at=at,
     )
 
 
