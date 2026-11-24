@@ -1,0 +1,174 @@
+import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
+import type { FeatureCollection } from "geojson";
+import { MapLibreMap, type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { useEffect, useRef } from "react";
+import { ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
+import { useTrackStore } from "./store";
+import type { LngLat, Track, Zone } from "./types";
+
+const STYLE_URL = "https://tiles.openfreemap.org/styles/dark"; // free, no API key
+const STOPPED_KNOTS = 0.5; // below this, show a circle instead of an arrow
+
+// Area boxes from GET /area, in aisstream order: [[lat, lon], [lat, lon]].
+type Box = [[number, number], [number, number]];
+
+function isMoving(t: Track): boolean {
+  // AIS uses COG 360 for "not available": no direction to show.
+  return t.sog >= STOPPED_KNOTS && t.cog < 360;
+}
+
+// All ships go into one GeoJSON source. Updating one source per change is far
+// cheaper than one DOM marker per ship once there are hundreds of ships.
+function toGeoJSON(tracks: Record<number, Track>): FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: Object.values(tracks).map((t) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [t.longitude, t.latitude] }, // GeoJSON: lon first!
+      properties: {
+        mmsi: t.mmsi,
+        icon: (isMoving(t) ? "ship-moving" : "ship-stopped") + (t.stale ? "-stale" : ""),
+        cog: t.cog,
+        stale: t.stale,
+      },
+    })),
+  };
+}
+
+// Zone colours by kind; unknown kinds fall back to grey.
+const ZONE_COLOR: ExpressionSpecification = ["match", ["get", "kind"], "restricted", "#ef4444", "protected", "#22c55e", "speed", "#f59e0b", "#94a3b8"];
+
+function zonesGeoJSON(zones: Zone[]): FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: zones.map((z) => ({
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        // Config is [lat, lon]; GeoJSON is [lon, lat] and wants the ring closed.
+        coordinates: [[...z.polygon, z.polygon[0]].map(([lat, lon]) => [lon, lat])],
+      },
+      properties: { name: z.name, kind: z.kind },
+    })),
+  };
+}
+
+function routeGeoJSON(route: LngLat[]): FeatureCollection {
+  // A line needs at least two points; an empty collection draws nothing.
+  if (route.length < 2) return { type: "FeatureCollection", features: [] };
+  return {
+    type: "FeatureCollection",
+    features: [{ type: "Feature", geometry: { type: "LineString", coordinates: route }, properties: {} }],
+  };
+}
+
+export function MapView() {
+  const container = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+
+  // Create the map once.
+  useEffect(() => {
+    const map = new MapLibreMap({
+      container: container.current!,
+      style: STYLE_URL,
+      center: [-8.0, 38.5], // replaced by the configured area below
+      zoom: 6,
+    });
+    mapRef.current = map;
+
+    fetch("/api/area")
+      .then((r) => r.json())
+      .then((area: { boxes: Box[] }) => {
+        // Frame the union of all boxes (e.g. mainland + Madeira + Azores).
+        const lats = area.boxes.flatMap(([[a], [b]]) => [a, b]);
+        const lons = area.boxes.flatMap(([[, a], [, b]]) => [a, b]);
+        map.fitBounds(
+          [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+          { padding: 20, animate: false },
+        );
+      })
+      .catch(() => {}); // keep the default view if the backend is down
+
+    map.on("load", () => {
+      for (const stale of [false, true]) {
+        const suffix = stale ? "-stale" : "";
+        map.addImage(`ship-moving${suffix}`, movingIcon(stale), { pixelRatio: ICON_PIXEL_RATIO });
+        map.addImage(`ship-stopped${suffix}`, stoppedIcon(stale), { pixelRatio: ICON_PIXEL_RATIO });
+      }
+      map.addSource("ships", { type: "geojson", data: toGeoJSON(useTrackStore.getState().tracks) });
+      // Zones, drawn first so they sit under routes and ships.
+      map.addSource("zones", { type: "geojson", data: zonesGeoJSON([]) });
+      map.addLayer({ id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": ZONE_COLOR, "fill-opacity": 0.12 } });
+      map.addLayer({ id: "zones-line", type: "line", source: "zones", paint: { "line-color": ZONE_COLOR, "line-width": 1.5, "line-dasharray": [3, 2] } });
+      map.addLayer({
+        id: "zones-label", type: "symbol", source: "zones",
+        layout: { "text-field": ["get", "name"], "text-size": 11 },
+        paint: { "text-color": ZONE_COLOR, "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
+      });
+      fetch("/api/zones")
+        .then((r) => r.json())
+        .then((zones: Zone[]) => (map.getSource("zones") as GeoJSONSource).setData(zonesGeoJSON(zones)))
+        .catch(() => {});
+
+      // Route of the selected ship, drawn under the ship icons.
+      map.addSource("route", { type: "geojson", data: routeGeoJSON([]) });
+      map.addLayer({
+        id: "route",
+        type: "line",
+        source: "route",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#facc15", "line-width": 2, "line-opacity": 0.8 },
+      });
+      map.addLayer({
+        id: "selected-ring",
+        type: "circle",
+        source: "ships",
+        filter: ["==", ["get", "mmsi"], -1],
+        paint: { "circle-radius": 14, "circle-color": "transparent", "circle-stroke-color": "#facc15", "circle-stroke-width": 2 },
+      });
+      map.addLayer({
+        id: "ships",
+        type: "symbol",
+        source: "ships",
+        layout: {
+          "icon-image": ["get", "icon"],
+          "icon-rotate": ["get", "cog"],
+          "icon-rotation-alignment": "map", // rotate relative to north, not the screen
+          "icon-allow-overlap": true, // never hide ships, even when crowded in port
+          // Draw live ships on top of stale ones.
+          "symbol-sort-key": ["case", ["get", "stale"], 0, 1],
+        },
+        paint: { "icon-opacity": ["case", ["get", "stale"], 0.6, 1] },
+      });
+      map.on("click", "ships", (e: MapLayerMouseEvent) => {
+        const mmsi = e.features?.[0]?.properties?.mmsi as number | undefined;
+        if (mmsi !== undefined) useTrackStore.getState().select(mmsi);
+      });
+      map.on("mouseenter", "ships", () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", "ships", () => (map.getCanvas().style.cursor = ""));
+
+      // Push store changes into the map. subscribe() runs outside React's
+      // render cycle: the map is updated directly, nothing re-renders.
+      let lastFocus: LngLat | null = null;
+      const sync = () => {
+        const { tracks, selected, route, focus } = useTrackStore.getState();
+        if (focus && focus !== lastFocus) {
+          // Same reference = same request; a click on an alert creates a new array.
+          lastFocus = focus;
+          map.flyTo({ center: focus, zoom: Math.max(map.getZoom(), 11) });
+        }
+        (map.getSource("ships") as GeoJSONSource).setData(toGeoJSON(tracks));
+        (map.getSource("route") as GeoJSONSource).setData(routeGeoJSON(route));
+        map.setFilter("selected-ring", ["==", ["get", "mmsi"], selected ?? -1]);
+      };
+      sync();
+      const unsubscribe = useTrackStore.subscribe(sync);
+      map.once("remove", unsubscribe);
+    });
+
+    return () => map.remove();
+  }, []);
+
+  return <div ref={container} className="map" />;
+}
