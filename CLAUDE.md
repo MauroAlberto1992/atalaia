@@ -36,6 +36,16 @@ The browser never connects to aisstream directly.
 - Enable permessage-deflate (uncompressed connections are rate-limited).
 - API key in `.env`, never in the repository.
 
+## Target audience: keep it in mind
+The point of this project is to be relevant to TEKEVER (drones for maritime
+surveillance; the ATLAS platform fuses sensor data, AI and operator tools).
+When proposing features or priorities, always ask: does this show something
+they need? Their core needs are maritime domain awareness: detecting
+non-cooperative / "dark" vessels, fusing AIS with drone and satellite sensors,
+anomaly detection (loitering, rendezvous, going dark, spoofing, illegal
+fishing), and helping operators decide where to send assets.
+Keep the company name out of user-facing text (README, UI); it lives here only.
+
 ## Working rules
 - Plan before code: present the plan and wait for the user's OK.
 - Small steps. Do not add anything outside the current phase.

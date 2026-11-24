@@ -63,7 +63,30 @@ Areas are configured in `backend/config/areas.toml` and zones in
 `backend/config/zones.toml`. Coordinates there are `[lat, lon]`, latitude first.
 
 ## Ideas for next steps
-Not planned yet; candidates for a v2.
+Not planned yet; candidates for a v2. The first two come first: they are
+what maritime surveillance work (maritime domain awareness) is actually about.
+
+### Priority 1: anomaly detection
+Turn the alert engine from "rules on zones" into "behaviour that doesn't fit":
+- **Loitering:** a ship circling or drifting in one place far from port or fishing grounds.
+- **Rendezvous:** two ships meeting at sea at low speed, a possible ship-to-ship transfer (smuggling, sanctions evasion).
+- **Going dark:** AIS switched off repeatedly, or in the same places; gaps scored by where and how long.
+- **Spoofing:** positions or speeds that are physically inconsistent, or identities (MMSI) seen in two places at once.
+- **Illegal fishing:** a fishing pattern inside protected or closed areas.
+
+Start with explainable rules and scores. Each alert says *why*, which an operator can act on.
+Add learned models where rules fall short.
+
+### Priority 2: fusion with non-cooperative sensors
+AIS only shows ships that *choose* to transmit.
+The real value is correlating it with detections that don't depend on the ship: radar, SAR satellite images, or EO/IR cameras on drones.
+- Add a second (initially simulated) source: e.g. "drone detections" with position, time and uncertainty.
+- **Correlate** each detection with AIS tracks (gating by distance and time, then assignment).
+  A detection with no matching AIS track is a **dark vessel**: the most valuable alert of all.
+- Show source and confidence per track on the map: AIS only, sensor only, or both.
+- **Tasking:** suggest where to send a drone to check an anomaly, ranked by priority and time to reach it.
+
+This is the "data fusion" part of a real Common Operational Picture, and it reuses the architecture as is: one more ingestion task feeding the same queue.
 
 ### Run it anywhere: Docker
 - A `docker compose up` with two services: the backend (uvicorn), and the frontend built and served by nginx.
