@@ -82,6 +82,6 @@ def test_recent_is_newest_first_and_bounded():
 def test_config_zones_load():
     zones = load_zones()
     assert len(zones) >= 4
-    ria = next(z for z in zones if z.name == "Ria Formosa")
+    ria = next(z for z in zones if z.name == "Ria Formosa (demo)")
     assert ria.contains(37.0, -7.9)  # lagoon off Faro
     assert not ria.contains(36.9, -7.9)  # open sea south of it

@@ -1,4 +1,5 @@
 # Zones of interest. DEMO DATA: plausible locations, not official boundaries.
+# Names end in "(demo)" so this is also clear on the map and in alerts.
 # polygon: list of [lat, lon] vertices — LATITUDE FIRST, like areas.toml.
 #   The polygon is closed automatically (don't repeat the first vertex).
 # kind: drives the colour on the map ("restricted", "protected", "speed").
@@ -7,14 +8,14 @@
 # Every zone also raises "dark ship" alerts (a ship goes silent inside it).
 
 [[zones]]
-name = "Portimão approach"
+name = "Portimão approach (demo)"
 kind = "speed"
 alert_on_entry = false
 max_speed_kn = 6
 polygon = [[37.135, -8.535], [37.135, -8.512], [37.095, -8.500], [37.090, -8.548]]
 
 [[zones]]
-name = "Ria Formosa"
+name = "Ria Formosa (demo)"
 kind = "protected"
 alert_on_entry = true
 polygon = [
@@ -23,13 +24,13 @@ polygon = [
 ]
 
 [[zones]]
-name = "Algarve exercise area"
+name = "Algarve exercise area (demo)"
 kind = "restricted"
 alert_on_entry = true
 polygon = [[36.900, -8.550], [36.900, -8.300], [36.800, -8.300], [36.800, -8.550]]
 
 [[zones]]
-name = "Tagus bar"
+name = "Tagus bar (demo)"
 kind = "speed"
 # Busy port entrance: entry alerts would be noise, so speed only.
 alert_on_entry = false
@@ -37,7 +38,7 @@ max_speed_kn = 12
 polygon = [[38.700, -9.420], [38.700, -9.250], [38.660, -9.250], [38.620, -9.420]]
 
 [[zones]]
-name = "Ponta Delgada exercise area"
+name = "Ponta Delgada exercise area (demo)"
 kind = "restricted"
 alert_on_entry = true
 polygon = [[37.760, -25.720], [37.760, -25.620], [37.700, -25.620], [37.700, -25.720]]
