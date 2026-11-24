@@ -1,11 +1,11 @@
 """API tests with fake events: no aisstream, no API key."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
 from minicop.api import create_app
-from minicop.events import PositionEvent
+from minicop.events import PositionEvent, Tick
 
 
 def event(mmsi: int, second: int = 0) -> PositionEvent:
@@ -65,3 +65,16 @@ def test_history_endpoint():
 def test_history_unknown_mmsi_is_404():
     with TestClient(create_app(ingest=False)) as client:
         assert client.get("/tracks/999/history").status_code == 404
+
+
+def test_live_sends_stale_and_remove():
+    app = create_app(ingest=False)
+    with TestClient(app) as client:
+        client.portal.call(feed, app, event(1))
+        t0 = event(1).received_at
+        with client.websocket_connect("/live") as ws:
+            ws.receive_json()  # snapshot
+            client.portal.call(feed, app, Tick(now=t0 + timedelta(minutes=10)))
+            assert ws.receive_json() == {"type": "stale", "mmsi": 1}
+            client.portal.call(feed, app, Tick(now=t0 + timedelta(minutes=60)))
+            assert ws.receive_json() == {"type": "remove", "mmsi": 1}

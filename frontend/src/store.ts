@@ -15,6 +15,15 @@ export function reduceLive(tracks: Record<number, Track>, msg: LiveMessage): Rec
     // A snapshot replaces everything (also after a reconnect).
     return Object.fromEntries(msg.tracks.map((t) => [t.mmsi, t]));
   }
+  if (msg.type === "stale") {
+    const t = tracks[msg.mmsi];
+    return t ? { ...tracks, [msg.mmsi]: { ...t, stale: true } } : tracks;
+  }
+  if (msg.type === "remove") {
+    if (!(msg.mmsi in tracks)) return tracks;
+    const { [msg.mmsi]: _removed, ...rest } = tracks;
+    return rest;
+  }
   // New object so React/Zustand see a change.
   return { ...tracks, [msg.track.mmsi]: msg.track };
 }
@@ -40,11 +49,16 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
   route: [],
 
   applyLive: (msg) =>
-    set((s) => ({
-      tracks: reduceLive(s.tracks, msg),
-      route:
-        msg.type === "track" && msg.track.mmsi === s.selected ? appendRoute(s.route, msg.track) : s.route,
-    })),
+    set((s) => {
+      const tracks = reduceLive(s.tracks, msg);
+      // The selected ship may be gone (removed, or missing from a new snapshot).
+      if (s.selected !== null && !(s.selected in tracks)) return { tracks, selected: null, route: [] };
+      return {
+        tracks,
+        route:
+          msg.type === "track" && msg.track.mmsi === s.selected ? appendRoute(s.route, msg.track) : s.route,
+      };
+    }),
 
   setConnection: (connection) => set({ connection }),
 

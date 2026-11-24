@@ -33,5 +33,13 @@ class Track(BaseModel):
     true_heading: int
     navigational_status: int
     last_seen: datetime
+    stale: bool = False  # no report for STALE_AFTER (phase 5)
     distance_nm: float = 0.0  # over the stored history
     avg_speed_kn: float = 0.0
+
+
+class Tick(BaseModel):
+    """Clock event, put on the same queue as positions so that the state task
+    (the single writer) is also the one that expires tracks."""
+
+    now: datetime

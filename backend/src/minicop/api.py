@@ -7,12 +7,13 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from minicop.config import Area, load_settings
-from minicop.events import PositionEvent, Track
+from minicop.events import PositionEvent, Tick, Track
 from minicop.history import HistoryPoint, HistoryStats
 from minicop.hub import Hub
 from minicop.ingest import IngestStatus, run_ingestion
@@ -21,6 +22,7 @@ from minicop.state import TrackStore
 log = logging.getLogger(__name__)
 
 EVENT_QUEUE_SIZE = 10_000
+SWEEP_INTERVAL_S = 30
 
 
 class HistoryResponse(BaseModel):
@@ -29,16 +31,30 @@ class HistoryResponse(BaseModel):
     stats: HistoryStats
 
 
-async def run_state(events: asyncio.Queue[PositionEvent], store: TrackStore, hub: Hub) -> None:
+async def run_state(events: asyncio.Queue[PositionEvent | Tick], store: TrackStore, hub: Hub) -> None:
     """The only task that mutates the store. Publishes every change to the hub."""
     while True:
         event = await events.get()
         try:
-            track = store.apply(event)
-            if track is not None:
-                hub.publish({"type": "track", "track": track.model_dump(mode="json")})
+            if isinstance(event, Tick):
+                result = store.sweep(event.now)
+                for mmsi in result.stale:
+                    hub.publish({"type": "stale", "mmsi": mmsi})
+                for mmsi in result.removed:
+                    hub.publish({"type": "remove", "mmsi": mmsi})
+            else:
+                track = store.apply(event)
+                if track is not None:
+                    hub.publish({"type": "track", "track": track.model_dump(mode="json")})
         finally:
             events.task_done()  # lets tests await events.join()
+
+
+async def run_clock(events: asyncio.Queue[PositionEvent | Tick]) -> None:
+    """Puts a Tick on the event queue every SWEEP_INTERVAL_S."""
+    while True:
+        await asyncio.sleep(SWEEP_INTERVAL_S)
+        await events.put(Tick(now=datetime.now(timezone.utc)))
 
 
 def create_app(ingest: bool = True) -> FastAPI:
@@ -50,7 +66,10 @@ def create_app(ingest: bool = True) -> FastAPI:
         app.state.store = TrackStore()
         app.state.hub = Hub()
         app.state.status = IngestStatus()
-        tasks = [asyncio.create_task(run_state(app.state.events, app.state.store, app.state.hub))]
+        tasks = [
+            asyncio.create_task(run_state(app.state.events, app.state.store, app.state.hub)),
+            asyncio.create_task(run_clock(app.state.events)),
+        ]
         app.state.area = None
         if ingest:
             settings = load_settings()  # fails fast if the API key is missing
@@ -69,6 +88,8 @@ def create_app(ingest: bool = True) -> FastAPI:
     async def health() -> dict:
         return {
             "aisstream_connected": app.state.status.connected,
+            "last_message_at": app.state.status.last_message_at,
+            "reconnects": app.state.status.reconnects,
             "tracks": len(app.state.store),
             "live_clients": len(app.state.hub),
         }

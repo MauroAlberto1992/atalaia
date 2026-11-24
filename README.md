@@ -3,7 +3,7 @@
 A small "Common Operational Picture": a live map of ships off the Portuguese
 coast (AIS via aisstream.io), with zones and alerts.
 
-**Status:** phase 4 (live map with per-ship routes). See `CLAUDE.md` for scope and phases, and
+**Status:** phase 5 (stale tracks, robust reconnection, whole Portuguese coast). See `CLAUDE.md` for scope and phases, and
 `docs/phases/` for per-phase notes.
 
 ## Setup

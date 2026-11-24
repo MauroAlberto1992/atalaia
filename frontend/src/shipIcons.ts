@@ -13,11 +13,12 @@ function draw(paint: (ctx: CanvasRenderingContext2D, s: number) => void): ImageD
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-const FILL = "#38bdf8";
+const LIVE_FILL = "#38bdf8";
+const STALE_FILL = "#94a3b8"; // grey: ship has gone silent
 const STROKE = "#0c1220";
 
 // Arrow pointing up (north); MapLibre rotates it by COG.
-export const movingIcon = () =>
+export const movingIcon = (stale = false) =>
   draw((ctx, s) => {
     ctx.beginPath();
     ctx.moveTo(s / 2, 3);
@@ -25,7 +26,7 @@ export const movingIcon = () =>
     ctx.lineTo(s / 2, s - 11);
     ctx.lineTo(8, s - 5);
     ctx.closePath();
-    ctx.fillStyle = FILL;
+    ctx.fillStyle = stale ? STALE_FILL : LIVE_FILL;
     ctx.strokeStyle = STROKE;
     ctx.lineWidth = 2;
     ctx.fill();
@@ -33,11 +34,11 @@ export const movingIcon = () =>
   });
 
 // Circle for ships that are not moving: a direction would be meaningless.
-export const stoppedIcon = () =>
+export const stoppedIcon = (stale = false) =>
   draw((ctx, s) => {
     ctx.beginPath();
     ctx.arc(s / 2, s / 2, 6, 0, Math.PI * 2);
-    ctx.fillStyle = FILL;
+    ctx.fillStyle = stale ? STALE_FILL : LIVE_FILL;
     ctx.strokeStyle = STROKE;
     ctx.lineWidth = 2;
     ctx.fill();

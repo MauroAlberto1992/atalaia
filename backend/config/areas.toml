@@ -1,9 +1,16 @@
-# Named areas of interest. Each bbox is two corners in aisstream order:
-# [[lat_min, lon_min], [lat_max, lon_max]] — LATITUDE FIRST.
+# Named areas of interest. An area is a list of boxes; each box is two corners
+# in aisstream order: [[lat_min, lon_min], [lat_max, lon_max]] — LATITUDE FIRST.
+# Several small boxes instead of one big one: covering mainland + Madeira +
+# Azores with a single box would subscribe to half the Atlantic.
 
 [areas.algarve]
-bbox = [[36.6, -9.2], [37.3, -7.3]]
+boxes = [
+  [[36.6, -9.2], [37.3, -7.3]],
+]
 
 [areas.portugal]
-# Mainland coast incl. offshore band; refined in phase 5.
-bbox = [[36.5, -10.5], [42.2, -6.1]]
+boxes = [
+  [[36.5, -10.5], [42.2, -7.3]],   # mainland coast and offshore band (Caminha to Guadiana)
+  [[32.3, -17.6], [33.2, -16.1]],  # Madeira and Porto Santo
+  [[36.8, -31.5], [39.9, -24.8]],  # Azores
+]

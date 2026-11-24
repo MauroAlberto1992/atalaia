@@ -4,8 +4,23 @@ Pure logic, no asyncio or I/O, so it is trivial to test. The async plumbing
 that feeds it lives in api.py.
 """
 
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+
 from minicop.events import PositionEvent, Track
 from minicop.history import AddResult, ShipHistory
+
+# Class A ships report every 2-10 s under way and every 3 min when moored,
+# so 10 min of silence is abnormal. After 1 h we forget the ship entirely,
+# otherwise memory would grow forever as ships pass through the area.
+STALE_AFTER = timedelta(minutes=10)
+REMOVE_AFTER = timedelta(minutes=60)
+
+
+@dataclass
+class SweepResult:
+    stale: list[int] = field(default_factory=list)
+    removed: list[int] = field(default_factory=list)
 
 
 class TrackStore:
@@ -43,6 +58,23 @@ class TrackStore:
         )
         self._tracks[event.mmsi] = track
         return track
+
+    def sweep(self, now: datetime) -> SweepResult:
+        """Mark silent ships stale and remove long-silent ones (with their history).
+        Only reports changes: a ship already stale is not reported again.
+        A stale ship that reports again becomes fresh through apply(), since
+        the new Track is built with stale=False."""
+        result = SweepResult()
+        for mmsi, track in list(self._tracks.items()):
+            silence = now - track.last_seen
+            if silence >= REMOVE_AFTER:
+                del self._tracks[mmsi]
+                self._history.pop(mmsi, None)
+                result.removed.append(mmsi)
+            elif silence >= STALE_AFTER and not track.stale:
+                self._tracks[mmsi] = track.model_copy(update={"stale": True})
+                result.stale.append(mmsi)
+        return result
 
     def history(self, mmsi: int) -> ShipHistory | None:
         return self._history.get(mmsi)

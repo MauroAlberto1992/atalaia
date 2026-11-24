@@ -4,6 +4,7 @@ const LABEL = { connecting: "Connecting…", open: "Live", closed: "Disconnected
 
 export function StatusBar() {
   const count = useTrackStore((s) => Object.keys(s.tracks).length);
+  const stale = useTrackStore((s) => Object.values(s.tracks).filter((t) => t.stale).length);
   const connection = useTrackStore((s) => s.connection);
   return (
     <div className="status">
@@ -11,7 +12,7 @@ export function StatusBar() {
       <span className={`dot ${connection}`} />
       <span>{LABEL[connection]}</span>
       <span className="sep">|</span>
-      <span>{count} ships</span>
+      <span>{count} ships{stale > 0 && ` (${stale} stale)`}</span>
     </div>
   );
 }

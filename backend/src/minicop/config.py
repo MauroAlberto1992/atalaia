@@ -5,7 +5,7 @@ import tomllib
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # backend/src/minicop/config.py -> parents[2] is backend/, parents[3] is the repo root.
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -16,9 +16,13 @@ DEFAULT_AREAS_FILE = BACKEND_DIR / "config" / "areas.toml"
 Corner = tuple[float, float]
 
 
+# (south-west, north-east)
+Box = tuple[Corner, Corner]
+
+
 class Area(BaseModel):
     name: str
-    bbox: tuple[Corner, Corner]  # (south-west, north-east)
+    boxes: list[Box] = Field(min_length=1)
 
 
 class Settings(BaseModel):

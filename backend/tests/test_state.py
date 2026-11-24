@@ -70,3 +70,29 @@ def test_jitter_still_updates_last_seen():
     store.apply(event(lat=37.0, at=T0))
     track = store.apply(event(lat=37.0, at=T0 + timedelta(seconds=10)))
     assert track is not None and track.last_seen == T0 + timedelta(seconds=10)
+
+
+def test_silent_ship_becomes_stale_once():
+    store = TrackStore()
+    store.apply(event(at=T0))
+    assert store.sweep(T0 + timedelta(minutes=5)).stale == []
+    assert store.sweep(T0 + timedelta(minutes=10)).stale == [263123456]
+    assert store.snapshot()[0].stale
+    assert store.sweep(T0 + timedelta(minutes=11)).stale == []  # not reported twice
+
+
+def test_stale_ship_that_reports_again_is_fresh():
+    store = TrackStore()
+    store.apply(event(at=T0))
+    store.sweep(T0 + timedelta(minutes=15))
+    track = store.apply(event(at=T0 + timedelta(minutes=16)))
+    assert track is not None and not track.stale
+
+
+def test_long_silent_ship_is_removed_with_history():
+    store = TrackStore()
+    store.apply(event(at=T0))
+    result = store.sweep(T0 + timedelta(minutes=60))
+    assert result.removed == [263123456]
+    assert len(store) == 0
+    assert store.history(263123456) is None

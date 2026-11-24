@@ -9,8 +9,8 @@ import type { LngLat, Track } from "./types";
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark"; // free, no API key
 const STOPPED_KNOTS = 0.5; // below this, show a circle instead of an arrow
 
-// Area corners from GET /area, in aisstream order: [[lat, lon], [lat, lon]].
-type BBox = [[number, number], [number, number]];
+// Area boxes from GET /area, in aisstream order: [[lat, lon], [lat, lon]].
+type Box = [[number, number], [number, number]];
 
 function isMoving(t: Track): boolean {
   // AIS uses COG 360 for "not available": no direction to show.
@@ -25,7 +25,12 @@ function toGeoJSON(tracks: Record<number, Track>): FeatureCollection {
     features: Object.values(tracks).map((t) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [t.longitude, t.latitude] }, // GeoJSON: lon first!
-      properties: { mmsi: t.mmsi, icon: isMoving(t) ? "ship-moving" : "ship-stopped", cog: t.cog },
+      properties: {
+        mmsi: t.mmsi,
+        icon: (isMoving(t) ? "ship-moving" : "ship-stopped") + (t.stale ? "-stale" : ""),
+        cog: t.cog,
+        stale: t.stale,
+      },
     })),
   };
 }
@@ -55,15 +60,23 @@ export function MapView() {
 
     fetch("/api/area")
       .then((r) => r.json())
-      .then((area: { bbox: BBox }) => {
-        const [[latMin, lonMin], [latMax, lonMax]] = area.bbox;
-        map.fitBounds([[lonMin, latMin], [lonMax, latMax]], { padding: 20, animate: false });
+      .then((area: { boxes: Box[] }) => {
+        // Frame the union of all boxes (e.g. mainland + Madeira + Azores).
+        const lats = area.boxes.flatMap(([[a], [b]]) => [a, b]);
+        const lons = area.boxes.flatMap(([[, a], [, b]]) => [a, b]);
+        map.fitBounds(
+          [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+          { padding: 20, animate: false },
+        );
       })
       .catch(() => {}); // keep the default view if the backend is down
 
     map.on("load", () => {
-      map.addImage("ship-moving", movingIcon(), { pixelRatio: ICON_PIXEL_RATIO });
-      map.addImage("ship-stopped", stoppedIcon(), { pixelRatio: ICON_PIXEL_RATIO });
+      for (const stale of [false, true]) {
+        const suffix = stale ? "-stale" : "";
+        map.addImage(`ship-moving${suffix}`, movingIcon(stale), { pixelRatio: ICON_PIXEL_RATIO });
+        map.addImage(`ship-stopped${suffix}`, stoppedIcon(stale), { pixelRatio: ICON_PIXEL_RATIO });
+      }
       map.addSource("ships", { type: "geojson", data: toGeoJSON(useTrackStore.getState().tracks) });
       // Route of the selected ship, drawn under the ship icons.
       map.addSource("route", { type: "geojson", data: routeGeoJSON([]) });
@@ -90,7 +103,10 @@ export function MapView() {
           "icon-rotate": ["get", "cog"],
           "icon-rotation-alignment": "map", // rotate relative to north, not the screen
           "icon-allow-overlap": true, // never hide ships, even when crowded in port
+          // Draw live ships on top of stale ones.
+          "symbol-sort-key": ["case", ["get", "stale"], 0, 1],
         },
+        paint: { "icon-opacity": ["case", ["get", "stale"], 0.6, 1] },
       });
       map.on("click", "ships", (e: MapLayerMouseEvent) => {
         const mmsi = e.features?.[0]?.properties?.mmsi as number | undefined;

@@ -35,7 +35,7 @@ export function ShipPanel() {
     ["Course", track.cog < 360 ? `${track.cog.toFixed(1)}°` : "n/a"],
     ["Heading", track.true_heading === 511 ? "n/a" : `${track.true_heading}°`],
     ["Status", NAV_STATUS[track.navigational_status] ?? `Code ${track.navigational_status}`],
-    ["Last seen", ago(track.last_seen, now)],
+    ["Last seen", ago(track.last_seen, now) + (track.stale ? " (stale)" : "")],
     ["Distance", `${track.distance_nm.toFixed(2)} nm`],
     ["Avg speed", `${track.avg_speed_kn.toFixed(1)} kn`],
   ];

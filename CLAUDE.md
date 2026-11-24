@@ -9,7 +9,7 @@ real-time systems with maps and data fusion.
 ## v1 scope
 - Single source: ships via AIS, from aisstream.io (WebSocket).
 - Configurable area: Algarve during development, whole Portuguese coast later.
-  The area lives in a config file (`backend/config/areas.toml`), never hard-coded.
+  The area lives in a config file (`backend/config/areas.toml`, a list of boxes per area), never hard-coded.
 - Out of v1: database, login, aircraft, satellites, deploy.
 
 ## Stack
@@ -21,7 +21,8 @@ One always-on process, event-driven internally (asyncio queues, no broker):
 1. Ingestion: task connected to aisstream with automatic reconnection.
    Converts each message into an event.
 2. State: sole owner of the MMSI -> Track map (single writer task).
-   Flags ships that stopped transmitting (phase 5).
+   Flags ships that stopped transmitting (stale after 10 min, removed after 60 min),
+   driven by a clock Tick on the same queue.
    Hub: fans out changes to WebSocket clients, dropping slow ones.
 3. API: `GET /tracks` (current snapshot) and `WS /live` (real-time changes).
 The browser never connects to aisstream directly.

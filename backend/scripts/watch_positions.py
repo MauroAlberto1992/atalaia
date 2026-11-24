@@ -20,7 +20,7 @@ async def main() -> None:
     settings = load_settings()
     subscription = {
         "APIKey": settings.api_key,
-        "BoundingBoxes": [settings.area.bbox],  # list of boxes; we send one
+        "BoundingBoxes": settings.area.boxes,
         "FilterMessageTypes": ["PositionReport"],
     }
 
