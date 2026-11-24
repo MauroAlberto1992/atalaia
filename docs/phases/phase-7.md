@@ -30,6 +30,7 @@
 | Problem | How it was caught | What changed |
 |---|---|---|
 | Installed TypeScript 7, which typescript-eslint doesn't support yet. | `npm install` peer-dependency error when adding ESLint. | Downgraded to 6.0; the "don't default to latest" lesson is in `CLAUDE.md`. |
+| Phase 3 added `engines` to `package.json`, but npm only warns on it. The user's Node 20.11 broke vitest with a cryptic `styleText` error, and the same thing had already happened once before with `npm run dev`. | The user's first `pre-commit run`. | `frontend/.npmrc` with `engine-strict=true`: `npm install` now fails with a clear `EBADENGINE` (tested). `frontend/.nvmrc` pins Node 22 for `nvm use`. |
 | `2**n` with an `int` is typed `Any`, so a "float" function was returning `Any`. | mypy strict. | Use a float base. |
 
 ## How to run

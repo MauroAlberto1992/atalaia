@@ -88,7 +88,8 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
 
 ## Lessons learned (from "What the agent got wrong")
 - Check the user's runtime versions (Python, Node) before choosing dependencies;
-  read the `engines` field of key packages and declare minimums.
+  read the `engines` field of key packages and declare minimums, and enforce
+  them (npm `engine-strict`); a declaration that only warns is not a guardrail.
 - Don't default to the newest major version; prefer what the tooling around it supports.
 - Measure external services before trusting library defaults (timeouts, first messages).
 - Build test fixtures from real captured data, not only from documentation.
