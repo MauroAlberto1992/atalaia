@@ -1,0 +1,9 @@
+# Named areas of interest. Each bbox is two corners in aisstream order:
+# [[lat_min, lon_min], [lat_max, lon_max]] — LATITUDE FIRST.
+
+[areas.algarve]
+bbox = [[36.6, -9.2], [37.3, -7.3]]
+
+[areas.portugal]
+# Mainland coast incl. offshore band; refined in phase 5.
+bbox = [[36.5, -10.5], [42.2, -6.1]]
