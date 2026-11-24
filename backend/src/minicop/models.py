@@ -37,5 +37,6 @@ class AisEnvelope(BaseModel):
     """Top-level message: the type, metadata, and a dict keyed by the type name."""
 
     message_type: str = Field(alias="MessageType")
-    metadata: MetaData = Field(alias="MetaData")
+    # Control messages (e.g. SubscriptionConfirmation) have no MetaData.
+    metadata: MetaData | None = Field(default=None, alias="MetaData")
     message: dict = Field(alias="Message")  # e.g. {"PositionReport": {...}}

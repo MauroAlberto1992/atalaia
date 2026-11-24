@@ -50,3 +50,9 @@ def test_missing_field_returns_none():
     data = json.loads(FIXTURE)
     del data["Message"]["PositionReport"]["UserID"]
     assert parse_position(json.dumps(data)) is None
+
+
+def test_subscription_confirmation_is_ignored():
+    # Real first frame from aisstream after subscribing: no MetaData.
+    frame = '{"Message":{"CompressionEnabled":true},"MessageType":"SubscriptionConfirmation"}'
+    assert parse_position(frame) is None
