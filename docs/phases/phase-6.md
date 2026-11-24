@@ -45,3 +45,12 @@
 
 ## How to run
 As in phase 3. Zones are in `backend/config/zones.toml`; restart the backend after editing them.
+
+## What the agent got wrong
+
+| Problem | How it was caught | What changed |
+|---|---|---|
+| Drew the Ria Formosa polygon from memory. It is visibly wrong on the real map (it covers land and open sea). | The user, looking at the map. | Geographic data needs a source, or is marked as demo. |
+| Named an invented zone "Algarve exercise area", which reads as an official military area. | The user asked what it was. | Invented data is labelled as such in the UI itself (names now end in "(demo)"). |
+| The docs said zone bounding boxes were "precomputed", but the code recomputed them on every `contains()` call, i.e. for every zone on every report. | Phase 7.1 review while fixing mypy findings. | Docs claims about performance get a check in code review. |
+| Imported a type from a transitive dependency. | Agent self-review. | Declare every package the code imports. |

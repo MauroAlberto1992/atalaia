@@ -1,10 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from minicop.alerts import AlertEngine, AlertKind
 from minicop.events import Track
 from minicop.zones import Zone, load_zones
 
-T0 = datetime(2026, 11, 24, 12, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
 
 BOX = [(37.0, -8.0), (37.0, -7.9), (37.1, -7.9), (37.1, -8.0)]
 RESTRICTED = Zone(name="R", kind="restricted", alert_on_entry=True, polygon=BOX)
@@ -14,8 +14,15 @@ INSIDE, OUTSIDE = (37.05, -7.95), (36.5, -7.95)
 
 def track(pos, sog=3.0, mmsi=1, seconds=0) -> Track:
     return Track(
-        mmsi=mmsi, ship_name="SHIP", latitude=pos[0], longitude=pos[1], sog=sog, cog=0,
-        true_heading=511, navigational_status=0, last_seen=T0 + timedelta(seconds=seconds),
+        mmsi=mmsi,
+        ship_name="SHIP",
+        latitude=pos[0],
+        longitude=pos[1],
+        sog=sog,
+        cog=0,
+        true_heading=511,
+        navigational_status=0,
+        last_seen=T0 + timedelta(seconds=seconds),
     )
 
 

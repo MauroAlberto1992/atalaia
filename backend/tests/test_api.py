@@ -1,6 +1,6 @@
 """API tests with fake events: no aisstream, no API key."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -11,17 +11,23 @@ from minicop.zones import Zone
 
 def event(mmsi: int, second: int = 0) -> PositionEvent:
     return PositionEvent(
-        mmsi=mmsi, latitude=37.0, longitude=-8.0, sog=5.0, cog=0.0, true_heading=0,
-        navigational_status=0, ship_name="TEST",
-        received_at=datetime(2026, 11, 24, 12, 0, second, tzinfo=timezone.utc),
+        mmsi=mmsi,
+        latitude=37.0,
+        longitude=-8.0,
+        sog=5.0,
+        cog=0.0,
+        true_heading=0,
+        navigational_status=0,
+        ship_name="TEST",
+        received_at=datetime(2026, 11, 24, 12, 0, second, tzinfo=UTC),
     )
 
 
 async def feed(app, *events: PositionEvent) -> None:
     """Put events on the queue and wait until the state task has applied them."""
     for e in events:
-        await app.state.events.put(e)
-    await app.state.events.join()
+        await app.state.runtime.events.put(e)
+    await app.state.runtime.events.join()
 
 
 def test_tracks_snapshot():
@@ -81,8 +87,12 @@ def test_live_sends_stale_and_remove():
             assert ws.receive_json() == {"type": "remove", "mmsi": 1}
 
 
-ZONE = Zone(name="Z", kind="restricted", alert_on_entry=True,
-            polygon=[(36.9, -8.1), (36.9, -7.9), (37.1, -7.9), (37.1, -8.1)])
+ZONE = Zone(
+    name="Z",
+    kind="restricted",
+    alert_on_entry=True,
+    polygon=[(36.9, -8.1), (36.9, -7.9), (37.1, -7.9), (37.1, -8.1)],
+)
 
 
 def test_zones_endpoint():

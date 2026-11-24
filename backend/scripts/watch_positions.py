@@ -53,4 +53,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     except ConfigError as exc:
-        raise SystemExit(f"Config error: {exc}")
+        raise SystemExit(f"Config error: {exc}") from None  # one line, no traceback

@@ -23,7 +23,7 @@ export type Corner = [number, number]; // [lat, lon], backend/config order
 // Mirrors backend/src/minicop/zones.py::Zone.
 export interface Zone {
   name: string;
-  kind: "restricted" | "protected" | "speed" | string;
+  kind: string; // "restricted" | "protected" | "speed"; other values get a default colour
   alert_on_entry: boolean;
   max_speed_kn: number | null;
   polygon: Corner[];

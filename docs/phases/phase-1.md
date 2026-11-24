@@ -33,3 +33,12 @@ cp ../.env.example ../.env          # put your AISSTREAM_API_KEY in it
 python scripts/watch_positions.py   # Ctrl+C to stop
 pytest
 ```
+
+## What the agent got wrong
+
+| Problem | How it was caught | What changed |
+|---|---|---|
+| The envelope model required `MetaData`. aisstream's first frame (`SubscriptionConfirmation`) has none, so it was logged as invalid. | Running against the live feed: a warning on every connect. | Fixtures come from real captured frames, not only from documentation. |
+| Kept the websockets default handshake timeout (10 s). aisstream took about 13 s, so every connection failed. | The user's first live run (`TimeoutError`), confirmed with `curl -v` timing. | Measure external services before relying on library defaults. |
+| The invalid-frame warning didn't say which field or frame, so diagnosing the issue above took two extra round trips. | Debugging with the user. | Log messages for dropped data include the location and a truncated sample. |
+| A missing API key surfaced as a full traceback. | User's first run. | Config errors print one clear line (fixed in phase 2). |

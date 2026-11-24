@@ -98,7 +98,7 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
     set({ selected: mmsi, route: [] });
     if (mmsi === null) return;
     fetch(`/api/tracks/${mmsi}/history`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((h: { points: { latitude: number; longitude: number }[] }) => {
         // The user may have clicked another ship while this was loading.
         if (get().selected !== mmsi) return;

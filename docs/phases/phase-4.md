@@ -41,3 +41,10 @@
 
 ## How to run
 Same as phase 3: `uvicorn minicop.api:app` in `backend/`, `npm run dev` in `frontend/`. Click a ship to see its route.
+
+## What the agent got wrong
+
+| Problem | How it was caught | What changed |
+|---|---|---|
+| Put route stats on `Track`, a change from the plan. | Flagged by the agent. | Same rule as above: state deviations explicitly. |
+| Debugging a screenshot for several minutes because an old fake server was still running on the port. | Agent noticed the API response didn't match the code. | Test servers run with `--strictPort` and earlier ones are killed first. |

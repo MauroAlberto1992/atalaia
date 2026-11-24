@@ -23,7 +23,7 @@ describe("reduceLive", () => {
   it("track message updates an existing ship without mutating the old state", () => {
     const before = { 1: track(1, 37) };
     const after = reduceLive(before, { type: "track", track: track(1, 38) });
-    expect(after[1].latitude).toBe(38);
+    expect(after[1]?.latitude).toBe(38);
     expect(before[1].latitude).toBe(37);
   });
 });
@@ -42,7 +42,7 @@ describe("appendRoute", () => {
 describe("reduceLive stale/remove", () => {
   it("marks a ship stale", () => {
     const after = reduceLive({ 1: track(1) }, { type: "stale", mmsi: 1 });
-    expect(after[1].stale).toBe(true);
+    expect(after[1]?.stale).toBe(true);
   });
 
   it("removes a ship", () => {

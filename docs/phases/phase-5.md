@@ -39,3 +39,9 @@
 ## How to run
 In `.env`, set `MINICOP_AREA=portugal`, then run the backend and frontend as in phase 3.
 `curl localhost:8000/health` shows `reconnects` and `last_message_at`.
+
+## What the agent got wrong
+
+| Problem | How it was caught | What changed |
+|---|---|---|
+| Stale ships (grey, 50% opacity) were nearly invisible on the dark basemap. | Agent's own screenshot. | Check visual states against the real background colour. |

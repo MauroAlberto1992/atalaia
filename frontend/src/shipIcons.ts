@@ -7,7 +7,8 @@ const RATIO = 2;
 function draw(paint: (ctx: CanvasRenderingContext2D, s: number) => void): ImageData {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = SIZE * RATIO;
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D canvas not available");
   ctx.scale(RATIO, RATIO);
   paint(ctx, SIZE);
   return ctx.getImageData(0, 0, canvas.width, canvas.height);

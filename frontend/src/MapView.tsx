@@ -46,8 +46,10 @@ function zonesGeoJSON(zones: Zone[]): FeatureCollection {
       type: "Feature",
       geometry: {
         type: "Polygon",
-        // Config is [lat, lon]; GeoJSON is [lon, lat] and wants the ring closed.
-        coordinates: [[...z.polygon, z.polygon[0]].map(([lat, lon]) => [lon, lat])],
+        // Config is [lat, lon]; GeoJSON is [lon, lat] and wants the ring
+        // closed (first vertex repeated at the end). The backend guarantees
+        // at least 3 vertices.
+        coordinates: [[...z.polygon, ...z.polygon.slice(0, 1)].map(([lat, lon]) => [lon, lat])],
       },
       properties: { name: z.name, kind: z.kind },
     })),
@@ -69,8 +71,10 @@ export function MapView() {
 
   // Create the map once.
   useEffect(() => {
+    // The div is rendered before effects run, so this only fails on a bug.
+    if (!container.current) throw new Error("map container not mounted");
     const map = new MapLibreMap({
-      container: container.current!,
+      container: container.current,
       style: STYLE_URL,
       center: [-8.0, 38.5], // replaced by the configured area below
       zoom: 6,
@@ -142,7 +146,7 @@ export function MapView() {
         paint: { "icon-opacity": ["case", ["get", "stale"], 0.6, 1] },
       });
       map.on("click", "ships", (e: MapLayerMouseEvent) => {
-        const mmsi = e.features?.[0]?.properties?.mmsi as number | undefined;
+        const mmsi = e.features?.[0]?.properties.mmsi as number | undefined;
         if (mmsi !== undefined) useTrackStore.getState().select(mmsi);
       });
       map.on("mouseenter", "ships", () => (map.getCanvas().style.cursor = "pointer"));
@@ -158,8 +162,9 @@ export function MapView() {
           lastFocus = focus;
           map.flyTo({ center: focus, zoom: Math.max(map.getZoom(), 11) });
         }
-        (map.getSource("ships") as GeoJSONSource).setData(toGeoJSON(tracks));
-        (map.getSource("route") as GeoJSONSource).setData(routeGeoJSON(route));
+        // setData returns a promise in MapLibre 6; we don't need to wait for it.
+        void (map.getSource("ships") as GeoJSONSource).setData(toGeoJSON(tracks));
+        void (map.getSource("route") as GeoJSONSource).setData(routeGeoJSON(route));
         map.setFilter("selected-ring", ["==", ["get", "mmsi"], selected ?? -1]);
       };
       sync();

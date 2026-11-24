@@ -9,7 +9,8 @@ const NAV_STATUS: Record<number, string> = {
 };
 
 function useNow(intervalMs = 1000): number {
-  const [now, setNow] = useState(Date.now());
+  // Lazy initialiser: Date.now() runs once, not on every render.
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), intervalMs);
     return () => clearInterval(id);

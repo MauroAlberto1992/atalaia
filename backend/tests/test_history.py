@@ -1,10 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from minicop.history import AddResult, ShipHistory
 
-T0 = datetime(2026, 11, 24, 12, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
 NM_LAT = 1 / 60  # one nautical mile north = 1 minute of latitude
 
 

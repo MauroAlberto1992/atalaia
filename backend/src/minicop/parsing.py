@@ -2,7 +2,7 @@
 the stream must keep flowing, so bad frames are logged and dropped."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ValidationError
 
@@ -24,9 +24,7 @@ def parse_position(raw: str | bytes) -> PositionReport | None:
     except ValidationError as exc:  # also covers malformed JSON
         err = exc.errors()[0]
         # loc is the path to the bad field, e.g. ('MetaData', 'time_utc').
-        log.warning(
-            "Dropping invalid frame: %s at %s | frame: %.200s", err["msg"], err["loc"], raw
-        )
+        log.warning("Dropping invalid frame: %s at %s | frame: %.200s", err["msg"], err["loc"], raw)
         return None
 
     if envelope.message_type != "PositionReport":
@@ -54,7 +52,7 @@ def parse_aisstream_time(value: str) -> datetime:
     whole, _, fraction = time_part.partition(".")
     fraction = (fraction + "000000")[:6]  # pad or truncate to microseconds
     naive = datetime.fromisoformat(f"{date_part}T{whole}.{fraction}")
-    return naive.replace(tzinfo=timezone.utc)
+    return naive.replace(tzinfo=UTC)
 
 
 def parse_event(raw: str | bytes) -> PositionEvent | None:

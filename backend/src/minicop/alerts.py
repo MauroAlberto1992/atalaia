@@ -9,7 +9,7 @@ Rules:
 
 from collections import deque
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
@@ -19,7 +19,7 @@ from minicop.zones import Zone
 MAX_ALERTS = 200
 
 
-class AlertKind(str, Enum):
+class AlertKind(StrEnum):
     ENTER = "enter"
     EXIT = "exit"
     SPEEDING = "speeding"
@@ -46,8 +46,13 @@ class AlertEngine:
 
     def _raise(self, kind: AlertKind, track: Track, zone: str, at: datetime, message: str) -> Alert:
         alert = Alert(
-            id=self._next_id, kind=kind, mmsi=track.mmsi,
-            ship_name=track.ship_name or str(track.mmsi), zone=zone, at=at, message=message,
+            id=self._next_id,
+            kind=kind,
+            mmsi=track.mmsi,
+            ship_name=track.ship_name or str(track.mmsi),
+            zone=zone,
+            at=at,
+            message=message,
         )
         self._next_id += 1
         self._alerts.append(alert)
@@ -67,11 +72,25 @@ class AlertEngine:
                 self._speeding.discard((track.mmsi, zone.name))  # next visit can alert again
             if zone.alert_on_entry and entered:
                 # A ship first seen already inside also counts as "entered".
-                out.append(self._raise(AlertKind.ENTER, track, zone.name, track.last_seen,
-                                       f"{name} entered {zone.name}"))
+                out.append(
+                    self._raise(
+                        AlertKind.ENTER,
+                        track,
+                        zone.name,
+                        track.last_seen,
+                        f"{name} entered {zone.name}",
+                    )
+                )
             if zone.alert_on_entry and left:
-                out.append(self._raise(AlertKind.EXIT, track, zone.name, track.last_seen,
-                                       f"{name} left {zone.name}"))
+                out.append(
+                    self._raise(
+                        AlertKind.EXIT,
+                        track,
+                        zone.name,
+                        track.last_seen,
+                        f"{name} left {zone.name}",
+                    )
+                )
             if (
                 zone.name in now_inside
                 and zone.max_speed_kn is not None
@@ -79,10 +98,16 @@ class AlertEngine:
                 and (track.mmsi, zone.name) not in self._speeding
             ):
                 self._speeding.add((track.mmsi, zone.name))
-                out.append(self._raise(
-                    AlertKind.SPEEDING, track, zone.name, track.last_seen,
-                    f"{name} at {track.sog:.1f} kn in {zone.name} (limit {zone.max_speed_kn:g} kn)",
-                ))
+                out.append(
+                    self._raise(
+                        AlertKind.SPEEDING,
+                        track,
+                        zone.name,
+                        track.last_seen,
+                        f"{name} at {track.sog:.1f} kn in {zone.name} "
+                        f"(limit {zone.max_speed_kn:g} kn)",
+                    )
+                )
 
         self._inside[track.mmsi] = now_inside
         return out

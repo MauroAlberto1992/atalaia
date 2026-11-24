@@ -6,12 +6,12 @@ import logging
 import random
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from websockets.asyncio.client import connect
 
 from minicop.config import Settings
-from minicop.events import PositionEvent
+from minicop.events import PositionEvent, Tick
 from minicop.parsing import parse_event
 
 log = logging.getLogger(__name__)
@@ -29,12 +29,16 @@ class Backoff:
     `rand` is injectable so tests are deterministic.
     """
 
-    def __init__(self, base: float = 1, cap: float = 60, rand: Callable[[], float] = random.random):
-        self.base, self.cap, self._rand = base, cap, rand
+    def __init__(
+        self, base: float = 1, cap: float = 60, rand: Callable[[], float] = random.random
+    ) -> None:
+        self.base: float = base
+        self.cap: float = cap
+        self._rand = rand
         self._attempt = 0
 
     def next(self) -> float:
-        nominal = min(self.cap, self.base * 2**self._attempt)
+        nominal = min(self.cap, self.base * 2.0**self._attempt)  # float base: int**int is typed Any
         self._attempt += 1
         return nominal * (0.5 + 0.5 * self._rand())
 
@@ -52,13 +56,15 @@ class IngestStatus:
 
 
 async def run_ingestion(
-    settings: Settings, events: asyncio.Queue, status: IngestStatus
+    settings: Settings, events: "asyncio.Queue[PositionEvent | Tick]", status: IngestStatus
 ) -> None:
-    subscription = json.dumps({
-        "APIKey": settings.api_key,
-        "BoundingBoxes": settings.area.boxes,
-        "FilterMessageTypes": ["PositionReport"],
-    })
+    subscription = json.dumps(
+        {
+            "APIKey": settings.api_key,
+            "BoundingBoxes": settings.area.boxes,
+            "FilterMessageTypes": ["PositionReport"],
+        }
+    )
     backoff = Backoff()
     while True:  # runs until the task is cancelled at shutdown
         connected_at: float | None = None
@@ -73,7 +79,7 @@ async def run_ingestion(
                     # Watchdog: a connection can stay "open" while nothing
                     # arrives (e.g. a dead NAT mapping). Treat silence as failure.
                     frame = await asyncio.wait_for(ws.recv(), SILENCE_TIMEOUT_S)
-                    status.last_message_at = datetime.now(timezone.utc)
+                    status.last_message_at = datetime.now(UTC)
                     if isinstance(frame, bytes):
                         frame = frame.decode()
                     if frame.startswith('{"error"'):

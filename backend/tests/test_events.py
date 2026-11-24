@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -10,7 +10,7 @@ FIXTURE = (Path(__file__).parent / "fixtures" / "position_report.json").read_tex
 
 def test_parse_time_truncates_nanoseconds_to_utc():
     t = parse_aisstream_time("2026-11-24 21:30:12.123456789 +0000 UTC")
-    assert t == datetime(2026, 11, 24, 21, 30, 12, 123456, tzinfo=timezone.utc)
+    assert t == datetime(2026, 11, 24, 21, 30, 12, 123456, tzinfo=UTC)
 
 
 def test_parse_time_short_fraction():

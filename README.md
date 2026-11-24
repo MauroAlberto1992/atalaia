@@ -1,5 +1,7 @@
 # atalaia — Mini-COP
 
+[![CI](https://github.com/MauroAlberto1992/atalaia/actions/workflows/ci.yml/badge.svg)](https://github.com/MauroAlberto1992/atalaia/actions/workflows/ci.yml)
+
 A small **Common Operational Picture**: a live map of ships off the Portuguese
 coast (mainland, Madeira and Azores), built from real AIS data, with route
 history, zones and alerts.
@@ -115,6 +117,20 @@ This is the "data fusion" part of a real Common Operational Picture, and it reus
   - positions that jump in ways that suggest AIS spoofing.
 - **Vessel type from movement.** Classify a ship from how it moves (fishing vs. cargo vs. leisure) when its declared type is missing or doesn't match.
 - **Natural-language operator assistant.** An LLM over the live picture and the alerts could answer questions like "which ships went dark near Sagres today?" or write a shift summary.
+
+## Built with AI agents
+Most of the code was written by an AI coding agent (Claude Code), directed through:
+- written specs per phase;
+- a shared context file (`CLAUDE.md`);
+- review and live testing by the developer.
+
+Guardrails run before every commit and in CI:
+- ruff, mypy (strict) and pytest for the backend;
+- eslint, tsc and vitest for the frontend;
+- gitleaks for secrets.
+
+Every phase summary records what the agent got wrong and how it was caught.
+See [`docs/ai-workflow.md`](docs/ai-workflow.md).
 
 ## How it was built
 In phases, each with a plan, tests and a write-up of the decisions in
