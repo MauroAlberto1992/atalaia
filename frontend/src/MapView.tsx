@@ -1,11 +1,18 @@
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
 import type { FeatureCollection } from "geojson";
-import { MapLibreMap, type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
+import { MapLibreMap, setWorkerUrl, type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
+// MapLibre 6 loads its web worker from a file next to its own module. The dev
+// server serves it from node_modules, but `vite build` does not copy it, so in
+// production the request fell through to index.html and no map was drawn.
+// Importing it with ?url makes Vite emit the file and gives us its final URL.
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import { ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
 import { useTrackStore } from "./store";
 import type { LngLat, Track, Zone } from "./types";
+
+setWorkerUrl(workerUrl);
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark"; // free, no API key
 const STOPPED_KNOTS = 0.5; // below this, show a circle instead of an arrow
