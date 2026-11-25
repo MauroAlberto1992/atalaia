@@ -97,6 +97,9 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
 - Build test fixtures from real captured data, not only from documentation.
 - Test data must be physically plausible (speeds, distances, times).
 - Verify UI changes in a real browser; passing tests and builds are not enough.
+  Verify the artefact that ships (production build / Docker image), not only the dev server.
+- Test a new guardrail against the old, broken version: if it doesn't fail there, it isn't a guardrail.
+- SPA fallbacks (`try_files ... /index.html`) can hide missing files behind a 200; assets must 404.
 - Logs for dropped data say where and include a truncated sample.
 - Geographic or domain data needs a source, or is labelled as demo in the UI itself.
 - Claims in docs (e.g. "precomputed") are checked against the code in review.
