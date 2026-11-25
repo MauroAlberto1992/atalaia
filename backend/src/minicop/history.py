@@ -90,5 +90,16 @@ class ShipHistory:
         avg = self._distance_nm / (duration_s / 3600) if duration_s > 0 else 0.0
         return HistoryStats(distance_nm=self._distance_nm, duration_s=duration_s, avg_speed_kn=avg)
 
+    def recent(self, since: datetime) -> list[tuple[float, float, datetime]]:
+        """(lat, lon, t) of points at or after `since`, oldest first.
+        Walks from the newest end, so it costs only the size of the window."""
+        out: list[tuple[float, float, datetime]] = []
+        for p in reversed(self._points):
+            if p.t < since:
+                break
+            out.append((p.lat, p.lon, p.t))
+        out.reverse()
+        return out
+
     def points(self) -> list[HistoryPoint]:
         return [HistoryPoint(latitude=p.lat, longitude=p.lon, t=p.t) for p in self._points]

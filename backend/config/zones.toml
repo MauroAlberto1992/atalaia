@@ -42,3 +42,42 @@ name = "Ponta Delgada exercise area (demo)"
 kind = "restricted"
 alert_on_entry = true
 polygon = [[37.760, -25.720], [37.760, -25.620], [37.700, -25.620], [37.700, -25.720]]
+
+# --- Port areas (demo, approximate rectangles) ---------------------------
+# kind = "port": no alerts of their own. Loitering, rendezvous and "dark"
+# alerts are ignored inside them, since stopping or switching off is normal there.
+
+[[zones]]
+name = "Port of Portimão (demo)"
+kind = "port"
+polygon = [[37.100, -8.550], [37.150, -8.550], [37.150, -8.510], [37.100, -8.510]]
+
+[[zones]]
+name = "Port of Lagos (demo)"
+kind = "port"
+polygon = [[37.090, -8.680], [37.115, -8.680], [37.115, -8.660], [37.090, -8.660]]
+
+[[zones]]
+name = "Port of Faro-Olhão (demo)"
+kind = "port"
+polygon = [[36.990, -7.950], [37.030, -7.950], [37.030, -7.820], [36.990, -7.820]]
+
+[[zones]]
+name = "Port of Lisbon (demo)"
+kind = "port"
+polygon = [[38.660, -9.250], [38.750, -9.250], [38.750, -9.080], [38.660, -9.080]]
+
+[[zones]]
+name = "Port of Sines (demo)"
+kind = "port"
+polygon = [[37.930, -8.890], [37.970, -8.890], [37.970, -8.840], [37.930, -8.840]]
+
+[[zones]]
+name = "Port of Funchal (demo)"
+kind = "port"
+polygon = [[32.630, -16.930], [32.650, -16.930], [32.650, -16.890], [32.630, -16.890]]
+
+[[zones]]
+name = "Port of Ponta Delgada (demo)"
+kind = "port"
+polygon = [[37.730, -25.670], [37.750, -25.670], [37.750, -25.640], [37.730, -25.640]]

@@ -44,7 +44,9 @@ function toGeoJSON(tracks: Record<number, Track>): FeatureCollection {
 }
 
 // Zone colours by kind; unknown kinds fall back to grey.
-const ZONE_COLOR: ExpressionSpecification = ["match", ["get", "kind"], "restricted", "#ef4444", "protected", "#22c55e", "speed", "#f59e0b", "#94a3b8"];
+const ZONE_COLOR: ExpressionSpecification = ["match", ["get", "kind"], "restricted", "#ef4444", "protected", "#22c55e", "speed", "#f59e0b", "port", "#64748b", "#94a3b8"];
+// Ports are context (where stopping is normal), not alert areas: draw them faintly.
+const IS_PORT: ExpressionSpecification = ["==", ["get", "kind"], "port"];
 
 function zonesGeoJSON(zones: Zone[]): FeatureCollection {
   return {
@@ -110,8 +112,8 @@ export function MapView() {
       map.addSource("ships", { type: "geojson", data: toGeoJSON(useTrackStore.getState().tracks) });
       // Zones, drawn first so they sit under routes and ships.
       map.addSource("zones", { type: "geojson", data: zonesGeoJSON([]) });
-      map.addLayer({ id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": ZONE_COLOR, "fill-opacity": 0.12 } });
-      map.addLayer({ id: "zones-line", type: "line", source: "zones", paint: { "line-color": ZONE_COLOR, "line-width": 1.5, "line-dasharray": [3, 2] } });
+      map.addLayer({ id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": ZONE_COLOR, "fill-opacity": ["case", IS_PORT, 0.05, 0.12] } });
+      map.addLayer({ id: "zones-line", type: "line", source: "zones", paint: { "line-color": ZONE_COLOR, "line-width": 1.5, "line-dasharray": [3, 2], "line-opacity": ["case", IS_PORT, 0.4, 1] } });
       map.addLayer({
         id: "zones-label", type: "symbol", source: "zones",
         layout: { "text-field": ["get", "name"], "text-size": 11 },

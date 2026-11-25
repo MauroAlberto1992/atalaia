@@ -23,7 +23,7 @@ export type Corner = [number, number]; // [lat, lon], backend/config order
 // Mirrors backend/src/minicop/zones.py::Zone.
 export interface Zone {
   name: string;
-  kind: string; // "restricted" | "protected" | "speed"; other values get a default colour
+  kind: string; // "restricted" | "protected" | "speed" | "port"; others get a default colour
   alert_on_entry: boolean;
   max_speed_kn: number | null;
   polygon: Corner[];
@@ -33,12 +33,13 @@ export interface Zone {
 // Mirrors backend/src/minicop/alerts.py::Alert.
 export interface Alert {
   id: number;
-  kind: "enter" | "exit" | "speeding" | "dark";
+  kind: "enter" | "exit" | "speeding" | "dark" | "loitering" | "rendezvous" | "reappeared" | "spoofing";
   mmsi: number;
   ship_name: string;
-  zone: string;
+  zone: string | null; // null for behavioural anomalies
   at: string; // ISO 8601, UTC
-  message: string;
+  message: string; // includes the reason and the numbers behind it
+  other_mmsi: number | null; // second ship, for rendezvous
 }
 
 export type LiveMessage =

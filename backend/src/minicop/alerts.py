@@ -24,6 +24,11 @@ class AlertKind(StrEnum):
     EXIT = "exit"
     SPEEDING = "speeding"
     DARK = "dark"
+    # Behavioural anomalies (anomalies.py), not tied to a zone.
+    LOITERING = "loitering"
+    RENDEZVOUS = "rendezvous"
+    REAPPEARED = "reappeared"
+    SPOOFING = "spoofing"
 
 
 class Alert(BaseModel):
@@ -31,9 +36,10 @@ class Alert(BaseModel):
     kind: AlertKind
     mmsi: int
     ship_name: str
-    zone: str
+    zone: str | None = None  # None for behavioural anomalies
     at: datetime
-    message: str
+    message: str  # human-readable reason, with the numbers behind it
+    other_mmsi: int | None = None  # second ship, for rendezvous
 
 
 class AlertEngine:
@@ -44,7 +50,17 @@ class AlertEngine:
         self._alerts: deque[Alert] = deque(maxlen=max_alerts)  # oldest drop off
         self._next_id = 1
 
-    def _raise(self, kind: AlertKind, track: Track, zone: str, at: datetime, message: str) -> Alert:
+    def record(
+        self,
+        kind: AlertKind,
+        track: Track,
+        at: datetime,
+        message: str,
+        zone: str | None = None,
+        other_mmsi: int | None = None,
+    ) -> Alert:
+        """Create and keep an alert. Public so the anomaly detector shares the
+        same id sequence and recent-alerts list."""
         alert = Alert(
             id=self._next_id,
             kind=kind,
@@ -53,10 +69,14 @@ class AlertEngine:
             zone=zone,
             at=at,
             message=message,
+            other_mmsi=other_mmsi,
         )
         self._next_id += 1
         self._alerts.append(alert)
         return alert
+
+    def _raise(self, kind: AlertKind, track: Track, zone: str, at: datetime, message: str) -> Alert:
+        return self.record(kind, track, at, message, zone=zone)
 
     def on_track(self, track: Track) -> list[Alert]:
         """Evaluate a ship's new position. Returns the alerts it raised."""
@@ -115,9 +135,11 @@ class AlertEngine:
     def on_stale(self, track: Track, now: datetime) -> list[Alert]:
         """A ship stopped transmitting. Alert for each zone it was last seen in."""
         name = track.ship_name or str(track.mmsi)
+        # Switching AIS off in port is normal, so port areas don't count.
+        ports = {z.name for z in self._zones if z.kind == "port"}
         return [
             self._raise(AlertKind.DARK, track, zone, now, f"{name} went dark inside {zone}")
-            for zone in sorted(self._inside.get(track.mmsi, set()))
+            for zone in sorted(self._inside.get(track.mmsi, set()) - ports)
         ]
 
     def on_removed(self, mmsi: int) -> None:

@@ -57,7 +57,7 @@ bypass them.
 |---|---|
 | `ruff` (lint + format) | Unused code, likely bugs (bugbear), asyncio pitfalls, inconsistent style |
 | `mypy --strict` | Untyped or `Any`-typed code paths, wrong return types |
-| `pytest` (81 tests) | Regressions in parsing, state, history, alerts, API |
+| `pytest` (104 tests) | Regressions in parsing, state, history, alerts, API |
 | `eslint` (strict, type-aware + React hooks) | Floating promises, unsafe `any`, impure renders, hook misuse |
 | `tsc` with `noUncheckedIndexedAccess` | Lookups that can be `undefined` at runtime |
 | `vitest` | Regressions in the store reducers |

@@ -92,3 +92,11 @@ def test_config_zones_load():
     ria = next(z for z in zones if z.name == "Ria Formosa (demo)")
     assert ria.contains(37.0, -7.9)  # lagoon off Faro
     assert not ria.contains(36.9, -7.9)  # open sea south of it
+
+
+def test_no_dark_alert_inside_a_port():
+    port = Zone(name="P", kind="port", polygon=BOX)
+    e = AlertEngine([port, RESTRICTED])
+    e.on_track(track(INSIDE))
+    # Inside both zones: dark only for the restricted one, not the port.
+    assert [a.zone for a in e.on_stale(track(INSIDE), T0)] == ["R"]
