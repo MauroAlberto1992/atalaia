@@ -20,3 +20,13 @@ gap_min_min = 30
 # Possible spoofing: at least `spoof_jumps` impossible jumps within `spoof_window_min`.
 spoof_jumps = 3
 spoof_window_min = 10
+
+[coverage]
+# Coverage gap: at least `min_ships` in one region (a `region_deg` grid cell,
+# 0.5 deg ~ 30 nm) went silent with last reports within `max_spread_s`.
+# Reported as one alert; their per-ship "dark" / "reappeared" alerts are
+# suppressed. Gaps are forgotten after `gap_memory_h`.
+min_ships = 4
+max_spread_s = 120
+region_deg = 0.5
+gap_memory_h = 2

@@ -1,6 +1,6 @@
 # Phase 10 spec — Coverage gaps vs. ships going dark
 
-Status: proposed, waiting for approval.
+Status: approved.
 
 ## Problem (found on live data)
 In the phase 9 live run, several ships in the Tagus bar went "dark" in the same
@@ -57,3 +57,9 @@ Mitigation: the coverage alert lists the ships, so a human can judge. This will 
 - All guardrails and CI pass.
 - Verified in the browser with a replayed scenario.
 - Live run: when gaps like the Tagus one happen again, they show as a single coverage alert.
+
+## Addendum (approved): port false positives
+Found live: MAR DA ERICEIRA and ZE DA MARINHA raised a rendezvous alert (0.02 nm, 11 min) while **moored side by side in a port** that is not in the hand-drawn demo list (only 7 ports).
+1. **A real port list with a source.** Replace the hand-drawn port rectangles with ports from the NGA **World Port Index** (public domain), each a circle of about 1 nm around the published position. The source and date are recorded in the file.
+2. **AIS status "moored" (5).** If either ship reports moored, it is not a rendezvous. "At anchor" (1) still counts: ship-to-ship transfers are often done at anchor.
+   Limitation: many fishing boats never update their status, hence point 1.

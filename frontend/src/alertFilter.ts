@@ -1,10 +1,11 @@
 import type { Alert } from "./types";
 
-// Two groups instead of one toggle per kind: eight toggles don't fit in the
-// panel header (especially on a phone), and an operator thinks in these two
-// terms: "where" (zone rules) vs "how it behaves" (anomalies).
-export type AlertGroup = "zones" | "behaviour";
-export const ALERT_GROUPS: AlertGroup[] = ["zones", "behaviour"];
+// A few groups instead of one toggle per kind: ten toggles don't fit in the
+// panel header (especially on a phone), and an operator thinks in these terms:
+// "where" (zone rules), "how it behaves" (anomalies), and "our own sensors"
+// (coverage), which is about reception, not about any ship.
+export type AlertGroup = "zones" | "behaviour" | "system";
+export const ALERT_GROUPS: AlertGroup[] = ["zones", "behaviour", "system"];
 
 const GROUP_OF: Record<Alert["kind"], AlertGroup> = {
   enter: "zones",
@@ -15,6 +16,8 @@ const GROUP_OF: Record<Alert["kind"], AlertGroup> = {
   rendezvous: "behaviour",
   reappeared: "behaviour",
   spoofing: "behaviour",
+  coverage_lost: "system",
+  coverage_restored: "system",
 };
 
 export function groupOf(alert: Alert): AlertGroup {
@@ -22,7 +25,7 @@ export function groupOf(alert: Alert): AlertGroup {
 }
 
 export function countByGroup(alerts: Alert[]): Record<AlertGroup, number> {
-  const counts: Record<AlertGroup, number> = { zones: 0, behaviour: 0 };
+  const counts: Record<AlertGroup, number> = { zones: 0, behaviour: 0, system: 0 };
   for (const a of alerts) counts[groupOf(a)] += 1;
   return counts;
 }

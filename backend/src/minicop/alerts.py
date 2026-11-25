@@ -29,6 +29,9 @@ class AlertKind(StrEnum):
     RENDEZVOUS = "rendezvous"
     REAPPEARED = "reappeared"
     SPOOFING = "spoofing"
+    # Sensor coverage (coverage.py): about our reception, not about a ship.
+    COVERAGE_LOST = "coverage_lost"
+    COVERAGE_RESTORED = "coverage_restored"
 
 
 class Alert(BaseModel):
