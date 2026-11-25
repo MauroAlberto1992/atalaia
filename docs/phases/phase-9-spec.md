@@ -1,6 +1,6 @@
 # Phase 9 spec — Anomaly detection
 
-Status: proposed, waiting for approval.
+Status: approved.
 
 ## Goal
 Go from "rules on zones" to "behaviour that doesn't fit", the top-priority

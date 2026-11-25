@@ -59,6 +59,7 @@ describe("reduceLive stale/remove", () => {
 
 const alert = (id: number): Alert => ({
   id, kind: "enter", mmsi: 1, ship_name: "T", zone: "Z", at: "2026-11-24T12:00:00Z", message: "m",
+  other_mmsi: null,
 });
 
 describe("reduceAlerts", () => {

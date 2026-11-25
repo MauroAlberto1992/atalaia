@@ -18,6 +18,11 @@ history, zones and alerts.
 - **Route history** per ship.
   - Haversine distance and average speed.
   - Filters GPS jitter and impossible jumps.
+- **Anomaly detection**, with each alert explaining why:
+  - loitering;
+  - two ships meeting at sea (possible transfer);
+  - reappearance after an AIS gap, with the distance and implied speed;
+  - possible spoofing (repeated impossible jumps).
 - **Zones and alerts.**
   - Entry and exit of restricted areas.
   - Speeding in speed-limited zones.
@@ -39,7 +44,7 @@ aisstream ──► ingestion ──► asyncio.Queue ──► state task ─�
 ## Stack
 - **Backend:** Python 3.11+, FastAPI, asyncio, Pydantic, websockets.
 - **Frontend:** React 19, TypeScript, Zustand, MapLibre GL, Vite.
-- **Tests:** pytest (81) and Vitest (12).
+- **Tests:** pytest (104) and Vitest (12), plus a browser check of the production images.
 
 ## Run it
 You need an API key from https://aisstream.io.
@@ -76,8 +81,12 @@ Areas are configured in `backend/config/areas.toml` and zones in
 Not planned yet; candidates for a v2. The first two come first: they are
 what maritime surveillance work (maritime domain awareness) is actually about.
 
-### Priority 1: anomaly detection
-Turn the alert engine from "rules on zones" into "behaviour that doesn't fit":
+### Priority 1: anomaly detection (first version done in phase 9)
+Loitering, rendezvous, reappearance and spoofing are implemented as explainable rules. Next:
+- tune them against real traffic;
+- add the ideas below that are not built yet.
+
+Full list of ideas:
 - **Loitering:** a ship circling or drifting in one place far from port or fishing grounds.
 - **Rendezvous:** two ships meeting at sea at low speed, a possible ship-to-ship transfer (smuggling, sanctions evasion).
 - **Going dark:** AIS switched off repeatedly, or in the same places; gaps scored by where and how long.

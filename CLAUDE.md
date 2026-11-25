@@ -24,7 +24,8 @@ One always-on process, event-driven internally (asyncio queues, no broker):
    Flags ships that stopped transmitting (stale after 10 min, removed after 60 min),
    driven by a clock Tick on the same queue.
    Hub: fans out changes to WebSocket clients, dropping slow ones.
-   AlertEngine (zones from `backend/config/zones.toml`) runs in the same state task.
+   AlertEngine (zones from `backend/config/zones.toml`) and AnomalyDetector
+   (thresholds in `backend/config/anomalies.toml`) run in the same state task.
 3. API: `GET /tracks` (current snapshot) and `WS /live` (real-time changes),
    plus `/tracks/{mmsi}/history`, `/zones`, `/alerts`, `/area`, `/health`.
 The browser never connects to aisstream directly.
@@ -74,6 +75,7 @@ Keep company names out of user-facing text (README, UI); they live here only.
 6. Zones and alerts.
 7. AI workflow and guardrails (see docs/ai-workflow.md).
 8. Docker: `docker compose up --build` -> http://localhost:8080.
+9. Anomaly detection: loitering, rendezvous, reappearance after AIS gaps, spoofing.
 
 ## Layout
 ```
@@ -105,3 +107,4 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
 - Claims in docs (e.g. "precomputed") are checked against the code in review.
 - Declare every package the code imports; no reliance on transitive dependencies.
 - Kill old dev servers before testing; use strict ports.
+- Keep test data clearly on one side of a threshold (e.g. chord vs arc made 4 kn fall just under 2 nm).

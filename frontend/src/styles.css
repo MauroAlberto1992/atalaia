@@ -56,6 +56,9 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .alert.enter .icon, .alert.exit .icon { color: #f97316; }
 .alert.speeding .icon { color: #facc15; }
 .alert.dark .icon { color: #ef4444; }
+.alert.loitering .icon, .alert.rendezvous .icon { color: #a78bfa; }
+.alert.reappeared .icon { color: #38bdf8; }
+.alert.spoofing .icon { color: #f43f5e; }
 
 @media (max-width: 600px) {
   .alerts { bottom: auto; top: 56px; max-height: 25vh; }

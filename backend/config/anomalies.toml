@@ -1,0 +1,22 @@
+# Thresholds for behavioural anomaly detection (anomalies.py).
+# First guesses, to be tuned against real traffic: see docs/phases/phase-9.md.
+
+[anomalies]
+# Loitering: moved at least `min_travel_nm` within `window_min`, yet every
+# point stayed within `max_radius_nm` of the centroid.
+loiter_window_min = 30
+loiter_min_travel_nm = 2.0
+loiter_max_radius_nm = 0.5
+
+# Rendezvous: two ships closer than `max_distance_nm`, both slower than
+# `max_speed_kn`, for at least `min_duration_min`.
+rendezvous_max_distance_nm = 0.3
+rendezvous_max_speed_kn = 2.0
+rendezvous_min_duration_min = 10
+
+# Reappearance after an AIS gap of at least this long.
+gap_min_min = 30
+
+# Possible spoofing: at least `spoof_jumps` impossible jumps within `spoof_window_min`.
+spoof_jumps = 3
+spoof_window_min = 10

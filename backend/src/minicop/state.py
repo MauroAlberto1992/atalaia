@@ -4,6 +4,7 @@ Pure logic, no asyncio or I/O, so it is trivial to test. The async plumbing
 that feeds it lives in api.py.
 """
 
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -21,12 +22,15 @@ REMOVE_AFTER = timedelta(minutes=60)
 class SweepResult:
     stale: list[int] = field(default_factory=list)
     removed: list[int] = field(default_factory=list)
+    removed_tracks: list[Track] = field(default_factory=list)  # last known state
 
 
 class TrackStore:
     def __init__(self) -> None:
         self._tracks: dict[int, Track] = {}
         self._history: dict[int, ShipHistory] = {}
+        # Times of rejected position jumps per ship, for spoofing detection.
+        self._jumps: dict[int, deque[datetime]] = {}
 
     def apply(self, event: PositionEvent) -> Track | None:
         """Update the ship's track. Returns the new Track, or None if nothing
@@ -38,6 +42,7 @@ class TrackStore:
 
         history = self._history.setdefault(event.mmsi, ShipHistory())
         if history.add(event.latitude, event.longitude, event.received_at) is AddResult.JUMP:
+            self._jumps.setdefault(event.mmsi, deque(maxlen=50)).append(event.received_at)
             return None  # don't move the ship on the map to a glitch position
         # JITTER still updates the track: speed, status and last_seen are fresh.
         stats = history.stats()
@@ -70,7 +75,9 @@ class TrackStore:
             if silence >= REMOVE_AFTER:
                 del self._tracks[mmsi]
                 self._history.pop(mmsi, None)
+                self._jumps.pop(mmsi, None)
                 result.removed.append(mmsi)
+                result.removed_tracks.append(track)
             elif silence >= STALE_AFTER and not track.stale:
                 self._tracks[mmsi] = track.model_copy(update={"stale": True})
                 result.stale.append(mmsi)
@@ -78,6 +85,10 @@ class TrackStore:
 
     def get(self, mmsi: int) -> Track | None:
         return self._tracks.get(mmsi)
+
+    def jumps_since(self, mmsi: int, since: datetime) -> int:
+        """How many position jumps were rejected for this ship since `since`."""
+        return sum(1 for t in self._jumps.get(mmsi, ()) if t >= since)
 
     def history(self, mmsi: int) -> ShipHistory | None:
         return self._history.get(mmsi)

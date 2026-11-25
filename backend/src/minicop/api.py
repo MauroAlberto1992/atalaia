@@ -8,13 +8,14 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from minicop.alerts import Alert, AlertEngine
+from minicop.anomalies import AnomalyConfig, AnomalyDetector, load_anomaly_config
 from minicop.config import Area, load_settings
 from minicop.events import PositionEvent, Tick, Track
 from minicop.history import HistoryPoint, HistoryStats
@@ -38,8 +39,14 @@ class HistoryResponse(BaseModel):
     stats: HistoryStats
 
 
-async def run_state(events: EventQueue, store: TrackStore, engine: AlertEngine, hub: Hub) -> None:
-    """The only task that mutates the store and the alert engine.
+async def run_state(
+    events: EventQueue,
+    store: TrackStore,
+    engine: AlertEngine,
+    anomalies: AnomalyDetector,
+    hub: Hub,
+) -> None:
+    """The only task that mutates the store, the alert engine and the anomaly detector.
     Publishes every change to the hub."""
 
     def publish_alerts(alerts: list[Alert]) -> None:
@@ -56,9 +63,11 @@ async def run_state(events: EventQueue, store: TrackStore, engine: AlertEngine, 
                     track = store.get(mmsi)
                     if track is not None:
                         publish_alerts(engine.on_stale(track, event.now))
-                for mmsi in result.removed:
-                    engine.on_removed(mmsi)
-                    hub.publish({"type": "remove", "mmsi": mmsi})
+                for removed in result.removed_tracks:
+                    engine.on_removed(removed.mmsi)
+                    anomalies.on_removed(removed)
+                    hub.publish({"type": "remove", "mmsi": removed.mmsi})
+                anomalies.on_tick(event.now)
             else:
                 track = store.apply(event)
                 if track is not None:
@@ -66,6 +75,11 @@ async def run_state(events: EventQueue, store: TrackStore, engine: AlertEngine, 
                     # by the time it shows an alert about it.
                     hub.publish({"type": "track", "track": track.model_dump(mode="json")})
                     publish_alerts(engine.on_track(track))
+                    publish_alerts(anomalies.on_track(track, store.history(track.mmsi)))
+                # Every report, accepted or rejected, can count towards spoofing.
+                window = timedelta(minutes=anomalies.cfg.spoof_window_min)
+                jumps = store.jumps_since(event.mmsi, event.received_at - window)
+                publish_alerts(anomalies.on_position(event, jumps))
         finally:
             events.task_done()  # lets tests await events.join()
 
@@ -89,29 +103,37 @@ class Runtime:
     store: TrackStore
     hub: Hub
     alerts: AlertEngine
+    anomalies: AnomalyDetector
     status: IngestStatus
     area: Area | None
 
 
-def create_app(ingest: bool = True, zones: list[Zone] | None = None) -> FastAPI:
+def create_app(
+    ingest: bool = True,
+    zones: list[Zone] | None = None,
+    anomaly_config: AnomalyConfig | None = None,
+) -> FastAPI:
     """ingest=False skips aisstream (and the API key); tests feed
     app.state.runtime.events. zones defaults to config/zones.toml; tests pass their own."""
     zone_list = load_zones() if zones is None else zones
+    anomaly_cfg = load_anomaly_config() if anomaly_config is None else anomaly_config
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings = load_settings() if ingest else None  # fails fast if the API key is missing
+        alert_engine = AlertEngine(zone_list)
         rt = Runtime(
             events=asyncio.Queue(maxsize=EVENT_QUEUE_SIZE),
             store=TrackStore(),
             hub=Hub(),
-            alerts=AlertEngine(zone_list),
+            alerts=alert_engine,
+            anomalies=AnomalyDetector(anomaly_cfg, zone_list, alert_engine),
             status=IngestStatus(),
             area=settings.area if settings else None,
         )
         app.state.runtime = rt
         tasks = [
-            asyncio.create_task(run_state(rt.events, rt.store, rt.alerts, rt.hub)),
+            asyncio.create_task(run_state(rt.events, rt.store, rt.alerts, rt.anomalies, rt.hub)),
             asyncio.create_task(run_clock(rt.events)),
         ]
         if settings:

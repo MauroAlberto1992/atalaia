@@ -1,7 +1,16 @@
 import { useTrackStore } from "./store";
 import type { Alert } from "./types";
 
-const ICON: Record<Alert["kind"], string> = { enter: "▶", exit: "◀", speeding: "⚡", dark: "◼" };
+const ICON: Record<Alert["kind"], string> = {
+  enter: "▶",
+  exit: "◀",
+  speeding: "⚡",
+  dark: "◼",
+  loitering: "↻",
+  rendezvous: "⇄",
+  reappeared: "◉",
+  spoofing: "⚠",
+};
 
 function hhmm(iso: string): string {
   // 24h clock: compact and unambiguous in an operations view.
