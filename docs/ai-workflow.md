@@ -62,6 +62,8 @@ bypass them.
 | `tsc` with `noUncheckedIndexedAccess` | Lookups that can be `undefined` at runtime |
 | `vitest` | Regressions in the store reducers |
 | `gitleaks` | API keys or tokens about to be committed (tested: it blocks a fake key) |
+| Browser check of the production images | A map that builds and serves but draws nothing (it caught two real bugs) |
+| `hadolint` + CI smoke test | Dockerfile mistakes; a stack that builds but doesn't actually serve; root user; `.env` inside images |
 
 **What adding them found** in code that already passed all tests (phase 7.1):
 - zone bounding boxes were recomputed on every check, despite the docs saying "precomputed";

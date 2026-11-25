@@ -40,6 +40,45 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  docker:
+    # Builds both images, starts the stack and smoke-tests it through nginx.
+    # The dummy key makes aisstream reject the subscription (the service keeps
+    # retrying), but every endpoint must still answer.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: printf 'AISSTREAM_API_KEY=dummy-key-for-smoke-test\nMINICOP_AREA=algarve\n' > .env
+      - run: docker compose up --build --detach --wait --wait-timeout 120
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install websockets
+      - run: python scripts/smoke_test.py http://localhost:8080
+      # A real browser against the production images: the HTTP smoke test
+      # passed while the map was blank (missing / mistyped MapLibre worker).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: node e2e/browser-check.mjs http://localhost:8080
+        working-directory: frontend
+      - name: Backend runs as non-root
+        run: test "$(docker compose exec -T backend id -u)" != "0"
+      - name: No .env inside the images
+        run: |
+          for svc in backend frontend; do
+            test "$(docker compose exec -T $svc sh -c 'find / -name .env -not -path "/proc/*" 2>/dev/null | wc -l')" = "0"
+          done
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down
+
   secrets:
     runs-on: ubuntu-latest
     steps:

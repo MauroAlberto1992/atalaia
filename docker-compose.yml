@@ -1,0 +1,17 @@
+# Run everything: docker compose up --build   ->  http://localhost:8080
+services:
+  backend:
+    build: ./backend
+    # The API key is passed at runtime from .env; it is never part of an image.
+    env_file: .env
+    restart: unless-stopped
+    # Not published to the host: only the frontend (nginx) talks to it.
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
