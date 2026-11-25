@@ -59,3 +59,9 @@ Each detector produces an `Alert` with a new `kind` and a human-readable reason 
 Thresholds are guesses until they have been watched against real traffic.
 Fishing boats will often look like they are loitering.
 The phase summary will report how noisy each detector is on live data.
+
+## Addendum (approved after the live run)
+- **Alert filter** in the alert panel header. There are two toggles, "Zones" (enter, exit, speeding, dark) and "Behaviour" (loitering, rendezvous, reappeared, spoofing), each showing its count, plus "All".
+- The choice is remembered per browser.
+- It filters the list only: the "new alerts" badge keeps counting everything, so nothing is hidden by accident.
+- Requested by the developer while running phase 9 on live data, where the list filled up quickly.

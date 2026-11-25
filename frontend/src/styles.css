@@ -44,7 +44,20 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
   display: flex; flex-direction: column; font-size: 12px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
 }
-.alerts h3 { margin: 0; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.alerts header {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 12px; border-bottom: 1px solid var(--border);
+}
+.alerts h3 { margin: 0; font-size: 13px; }
+.filters { display: flex; gap: 6px; margin-left: auto; }
+.chip {
+  padding: 2px 8px; border-radius: 10px; font: inherit; font-size: 11px; cursor: pointer;
+  background: none; color: var(--muted); border: 1px solid var(--border);
+}
+.chip[aria-pressed="true"] { color: var(--text); background: rgba(148, 163, 184, 0.15); border-color: #475569; }
+.chip.zones[aria-pressed="true"] { border-color: #f97316; }
+.chip.behaviour[aria-pressed="true"] { border-color: #a78bfa; }
+.alerts .empty { padding: 8px 12px; color: var(--muted); }
 .alerts ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 .alert {
   display: flex; gap: 8px; width: 100%; padding: 5px 12px; text-align: left;

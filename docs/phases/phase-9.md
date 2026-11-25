@@ -12,6 +12,10 @@
 - **`TrackStore`**: records rejected jumps (`jumps_since`), and `SweepResult.removed_tracks` gives the last known state of removed ships.
 - **`ShipHistory.recent(since)`**: walks from the newest end, so loitering costs only the window size, not all 2000 points.
 - **Frontend**: icons and colours for the new kinds; port zones drawn faintly.
+- **Alert filter** (spec addendum): "Zones" / "Behaviour" toggles with counts in the alert panel header, plus "All".
+  - It is remembered in `localStorage`, guarded with try/catch so private mode just falls back to showing everything.
+  - It filters the list only, not the "new alerts" badge.
+  - The filter functions in `alertFilter.ts` are pure and unit-tested.
 - **Tests**: 23 new (104 backend in total), all on synthetic, physically plausible tracks:
   - "fires" and "doesn't fire" cases for every detector;
   - once per episode, and re-arming;
@@ -29,7 +33,11 @@
 ## Verified
 - All tests and guardrails pass.
 - In a headless browser with a fake backend replaying 50 minutes of scenarios in a few seconds (event times drive the detectors, not the wall clock), all four alerts fired with sensible numbers. Clicking the rendezvous alert selects one of the two ships and flies to them.
-- **Not yet verified on live data.** The phase spec requires a live run on the developer's machine. How noisy each detector is on real traffic (fishing boats will look like loitering) is still to be reported.
+- **First live run (developer's machine, area `portugal`, about 107 ships):**
+  - port zones visible;
+  - a real `reappeared` alert: "TREPADEIRA AZUL reappeared after 30 min without AIS, 1.2 nm from where it vanished (implied 2.3 kn)".
+  - **Noise found:** several ships in the Tagus bar went "dark" in the same second (08:19:19), with 31 ships stale at once. That is almost certainly a coverage or feed gap, not ships switching AIS off, so the "dark" alerts were false. Proposed as the next fix.
+- **Not yet verified on live data:** The phase spec requires a live run on the developer's machine. How noisy each detector is on real traffic (fishing boats will look like loitering) is still to be reported.
 
 ## What the agent got wrong
 | Problem | How it was caught | What changed |
