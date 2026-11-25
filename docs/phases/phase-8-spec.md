@@ -1,6 +1,6 @@
 # Phase 8 spec — Docker
 
-Status: proposed, waiting for approval.
+Status: approved.
 
 ## Goal
 Run the whole Mini-COP with one command (`docker compose up`) on any machine

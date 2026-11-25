@@ -44,6 +44,14 @@ aisstream ──► ingestion ──► asyncio.Queue ──► state task ─�
 ## Run it
 You need an API key from https://aisstream.io.
 
+### With Docker (simplest)
+```bash
+cp .env.example .env        # set AISSTREAM_API_KEY
+docker compose up --build   # open http://localhost:8080
+```
+
+### For development
+
 ```bash
 cp .env.example .env        # set AISSTREAM_API_KEY; MINICOP_AREA=algarve or portugal
 
@@ -90,11 +98,6 @@ The real value is correlating it with detections that don't depend on the ship: 
 
 This is the "data fusion" part of a real Common Operational Picture, and it reuses the architecture as is: one more ingestion task feeding the same queue.
 
-### Run it anywhere: Docker
-- A `docker compose up` with two services: the backend (uvicorn), and the frontend built and served by nginx.
-- nginx also proxies `/api` and `/live`, as Vite does in development.
-- The API key is passed as an environment variable, never baked into the image.
-
 ### Persistence: a database
 - **PostgreSQL + PostGIS** (or TimescaleDB) for positions, tracks and alerts.
 - History survives restarts and is no longer capped at 2000 points per ship.
@@ -127,7 +130,8 @@ Most of the code was written by an AI coding agent (Claude Code), directed throu
 Guardrails run before every commit and in CI:
 - ruff, mypy (strict) and pytest for the backend;
 - eslint, tsc and vitest for the frontend;
-- gitleaks for secrets.
+- gitleaks for secrets;
+- hadolint for the Dockerfiles, plus a CI job that starts the containers and smoke-tests them.
 
 Every phase summary records what the agent got wrong and how it was caught.
 See [`docs/ai-workflow.md`](docs/ai-workflow.md).

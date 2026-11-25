@@ -10,7 +10,7 @@ real-time systems with maps and data fusion.
 - Single source: ships via AIS, from aisstream.io (WebSocket).
 - Configurable area: Algarve during development, whole Portuguese coast later.
   The area lives in a config file (`backend/config/areas.toml`, a list of boxes per area), never hard-coded.
-- Out of v1: database, login, aircraft, satellites, deploy.
+- Out of v1: database, login, aircraft, satellites, deploy (Docker images exist since phase 8; no hosting).
 
 ## Stack
 - Backend: Python, FastAPI + asyncio, Pydantic.
@@ -73,6 +73,7 @@ Keep company names out of user-facing text (README, UI); they live here only.
 5. Resilience (stale tracks, reconnection) and the whole coast.
 6. Zones and alerts.
 7. AI workflow and guardrails (see docs/ai-workflow.md).
+8. Docker: `docker compose up --build` -> http://localhost:8080.
 
 ## Layout
 ```
@@ -82,6 +83,7 @@ backend/
   tests/              # pytest
 docs/phases/          # one file per finished phase
 frontend/             # React + Zustand + MapLibre (phase 3+)
+docker-compose.yml    # backend + nginx frontend (phase 8)
 
 Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow docs.
 ```
