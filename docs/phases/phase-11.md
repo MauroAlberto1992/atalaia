@@ -1,7 +1,7 @@
 # Phase 11 — Real port list from OpenStreetMap
 
 ## Done
-- **`backend/config/ports.json`**: **359 port areas** from OpenStreetMap: 189 mainland, 17 Madeira, 28 Azores in the first export, and more after the wider query.
+- **`backend/config/ports.json`**: **359 port areas** from OpenStreetMap: 277 mainland, 21 Madeira, 61 Azores.
   - By kind: 180 marinas, 169 harbours, 10 fishing harbours.
   - **Source, licence (ODbL), OSM data timestamp (2026-11-26T23:18Z) and the exact query** are recorded in the file.
 - **`minicop/ports.py`**: `ports_from_overpass()` turns an Overpass response into ports.
