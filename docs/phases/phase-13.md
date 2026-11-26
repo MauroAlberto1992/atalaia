@@ -5,12 +5,16 @@
 - **Subscription and parser** cover messages 1/2/3, 18 and 19 (`POSITION_TYPES` in `parsing.py`). Class B carries no navigational status, so it is set to 15 ("not defined").
 - **`ais_class` ("A"/"B")** on `PositionReport`, `PositionEvent`, `Track`, in `/live`, and in the database: migration `002_ais_class.sql` adds `ais_class char(1) NOT NULL DEFAULT 'A'`, and existing rows were all Class A.
 - **`/health`**: `positions_class_a` and `positions_class_b`.
-- **Map:** Class B is drawn at 70% icon size; the panel shows "AIS class: B (small craft)".
+- **Map:** Class B is drawn **green** (`#4ade80`, lighter than the protected-zone green) and at 70% icon size; stale ships of either class stay grey. The panel shows "AIS class: B (small craft)".
+- **Coastal demo zones removed** (requested by the developer): Portimão approach, Ria Formosa, Tagus bar and the Ponta Delgada exercise area overlapped real ports and the coast. Only the offshore "Algarve exercise area (demo)" remains.
 - **Detectors and alerts:** unchanged. Class B boats are subject to every rule.
 - **Tests:** 12 new, plus the integration test extended, for 150 in total (including 3 against a real TimescaleDB).
   - Every captured frame parses, with the right class and status.
   - `ais_class` round-trips into the database.
   - Migrations 001 and 002 apply in order.
+
+## Deviations from the spec
+- The green colour for Class B and the removal of the coastal demo zones were not in the spec. Both were requested by the developer after the live run.
 
 ## Findings from the real frames
 - **Class B position reports carry no ship name**: `MetaData.ShipName` is empty. Class B names come in a separate message (type 24, `StaticDataReport`), which we don't subscribe to. Small craft therefore show their MMSI instead of a name. Subscribing to type 24 is a natural follow-up.
