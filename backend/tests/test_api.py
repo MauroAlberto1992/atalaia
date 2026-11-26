@@ -139,3 +139,13 @@ def test_lone_ship_still_goes_dark_end_to_end():
             client.portal.call(feed, app, Tick(now=t0 + timedelta(seconds=seconds)))
         kinds = [a["kind"] for a in client.get("/alerts").json()]
         assert "dark" in kinds and "coverage_lost" not in kinds
+
+
+def test_health_reports_pipeline_counters():
+    app = create_app(ingest=False)
+    with TestClient(app) as client:
+        client.portal.call(feed, app, event(1, 0), event(1, 0))  # second is out of order
+        health = client.get("/health").json()
+        assert health["positions_accepted"] == 1
+        assert health["rejected_out_of_order"] == 1
+        assert health["frames_received"] == 0  # no aisstream in tests

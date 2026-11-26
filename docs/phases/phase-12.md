@@ -42,9 +42,27 @@
   - the database is healthy and the migration applied;
   - the backend reports `db_connected: true`;
   - a row survived `docker compose down` / `up`.
-- **Not yet measured:** an hour of live AIS (the spec asks for rows/s and disk use). That needs the developer's machine.
+- **Live run (developer's Mac, area `portugal`, 33.5 min at night, 22:19–22:53 UTC):**
+  - **623 rows from 127 ships = 0.31 rows/s**, about 5 points per ship in half an hour;
+  - **208 kB**, about 330 bytes per row before compression. That includes the index and fixed table overhead, so it falls as the table grows. Compression only touches chunks older than 1 day, so it isn't measured yet;
+  - **0 dropped**, 0 queued.
+  - **Projection at this rate:** about 27 k rows/day and well under 1 GB for 30 days before compression. The database is nowhere near a limit.
+  - **The feed is far sparser than the spec's estimate** (20–40 rows/s). Three reasons:
+    - **night**: most fishing boats are moored, and moored ships report only every 3 min;
+    - **the free aisstream terrestrial coverage of Portugal is thin**: even a moored ship should give about 11 points in 33 min, and we see about 5;
+    - **we subscribe to `PositionReport` only (Class A)**, so small vessels (Class B) are not received at all. That is proposed as phase 13.
+  - **Consequence for routes:** few points per ship. Routes will have long straight gaps, and the UI should show the actual reported points.
+- **Pipeline counters added to `/health`**, so "the feed sends little" can be told apart from "we lose data":
+  - `frames_received`: every frame from aisstream;
+  - `positions_parsed`: frames that became a usable position;
+  - `positions_accepted`: positions accepted by the state;
+  - `rejected_out_of_order` and `rejected_jumps`: positions the state rejected.
+
+  Each step should be close to the previous one, and `db_written` close to `positions_accepted`.
+  This was not in the spec; it was added after the live run showed fewer rows than expected.
 
 ## Deviation from the spec
+- The pipeline counters above were added to `/health` (not in the spec), to explain the low live rate.
 - The CI docker job checks `db_connected`, but **not that rows are written**: with a dummy API key there is no AIS feed. Writing is covered by the integration test and by the outage test above.
 
 ## What the agent got wrong

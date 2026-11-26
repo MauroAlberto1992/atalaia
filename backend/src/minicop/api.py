@@ -210,6 +210,13 @@ def create_app(
             "aisstream_connected": rt.status.connected,
             "last_message_at": rt.status.last_message_at,
             "reconnects": rt.status.reconnects,
+            # Pipeline: frames from aisstream -> usable positions -> accepted
+            # by the state (the rest: out of order or impossible jumps).
+            "frames_received": rt.status.frames,
+            "positions_parsed": rt.status.positions,
+            "positions_accepted": rt.store.accepted,
+            "rejected_out_of_order": rt.store.out_of_order,
+            "rejected_jumps": rt.store.jumps_rejected,
             "tracks": len(rt.store),
             "live_clients": len(rt.hub),
             **_recorder_health(rt.recorder),
