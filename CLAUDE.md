@@ -10,7 +10,7 @@ real-time systems with maps and data fusion.
 - Single source: ships via AIS, from aisstream.io (WebSocket).
 - Configurable area: Algarve during development, whole Portuguese coast later.
   The area lives in a config file (`backend/config/areas.toml`, a list of boxes per area), never hard-coded.
-- Out of v1: database, login, aircraft, satellites, deploy (Docker images exist since phase 8; no hosting).
+- Out of v1: login, aircraft, satellites, hosting. (Docker since phase 8, database since phase 12.)
 
 ## Stack
 - Backend: Python, FastAPI + asyncio, Pydantic.
@@ -26,6 +26,9 @@ One always-on process, event-driven internally (asyncio queues, no broker):
    Hub: fans out changes to WebSocket clients, dropping slow ones.
    AlertEngine (zones from `backend/config/zones.toml`) and AnomalyDetector
    (thresholds in `backend/config/anomalies.toml`) and CoverageMonitor run in the same state task.
+4. Recorder (phase 12): accepted positions -> bounded in-process buffer -> batched COPY into
+   PostgreSQL + TimescaleDB + PostGIS (`db` service; migrations in `backend/migrations`).
+   Never blocks the live path; optional (off without `DATABASE_URL`).
 3. API: `GET /tracks` (current snapshot) and `WS /live` (real-time changes),
    plus `/tracks/{mmsi}/history`, `/zones`, `/alerts`, `/area`, `/health`.
 The browser never connects to aisstream directly.
@@ -77,6 +80,8 @@ Keep company names out of user-facing text (README, UI); they live here only.
 8. Docker: `docker compose up --build` -> http://localhost:8080.
 9. Anomaly detection: loitering, rendezvous, reappearance after AIS gaps, spoofing.
 10. Coverage gaps: many ships silent together = one coverage alert, not many "dark" alerts.
+11. Real port list from OpenStreetMap (branch claude/real-port-list, waiting for Overpass access).
+12. Record every position in TimescaleDB/PostGIS. Next: 13 routes from the DB, 14 user-drawn areas.
 
 ## Layout
 ```
@@ -110,4 +115,6 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
 - Kill old dev servers before testing; use strict ports.
 - "What the agent got wrong" entries must be real events from the session; never write a
   plausible-sounding one. An empty section is better than an invented one.
+- Test a diagnosis before applying the fix (e.g. pg_isready socket vs TCP turned out to make no difference).
+- Integration tests against the real dependency catch what unit tests with assumptions miss.
 - Keep test data clearly on one side of a threshold (e.g. chord vs arc made 4 kn fall just under 2 nm).

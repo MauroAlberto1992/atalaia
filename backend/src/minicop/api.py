@@ -6,6 +6,7 @@ Run from backend/:  uvicorn minicop.api:app
 import asyncio
 import contextlib
 import logging
+import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -22,6 +23,7 @@ from minicop.events import PositionEvent, Tick, Track
 from minicop.history import HistoryPoint, HistoryStats
 from minicop.hub import Hub
 from minicop.ingest import IngestStatus, run_ingestion
+from minicop.recorder import Recorder
 from minicop.state import TrackStore
 from minicop.zones import Zone, load_zones
 
@@ -47,6 +49,7 @@ async def run_state(
     anomalies: AnomalyDetector,
     coverage: CoverageMonitor,
     hub: Hub,
+    recorder: Recorder | None = None,
 ) -> None:
     """The only task that mutates the store, the alert engine and the anomaly detector.
     Publishes every change to the hub."""
@@ -85,6 +88,8 @@ async def run_state(
                     # Track first, then its alerts: the client knows the ship
                     # by the time it shows an alert about it.
                     hub.publish({"type": "track", "track": track.model_dump(mode="json")})
+                    if recorder is not None:
+                        recorder.enqueue(track)  # never waits (see recorder.py)
                     publish_alerts(engine.on_track(track))
                     restored, in_gap = coverage.on_track(track)
                     publish_alerts(restored)
@@ -122,8 +127,30 @@ class Runtime:
     alerts: AlertEngine
     anomalies: AnomalyDetector
     coverage: CoverageMonitor
+    recorder: Recorder | None  # None when DATABASE_URL is not set
     status: IngestStatus
     area: Area | None
+
+
+def _recorder_from_env() -> Recorder | None:
+    """Recording is optional: without DATABASE_URL everything works as before
+    (development without Docker, unit tests)."""
+    dsn = os.getenv("DATABASE_URL", "").strip()
+    if not dsn:
+        return None
+    return Recorder(dsn, retention_days=int(os.getenv("MINICOP_RETENTION_DAYS", "30")))
+
+
+def _recorder_health(recorder: Recorder | None) -> dict[str, object]:
+    if recorder is None:
+        return {"db_enabled": False}
+    return {
+        "db_enabled": True,
+        "db_connected": recorder.connected,
+        "db_written": recorder.written,
+        "db_queued": len(recorder.buffer),
+        "db_dropped": recorder.buffer.dropped,
+    }
 
 
 def create_app(
@@ -149,16 +176,21 @@ def create_app(
             alerts=alert_engine,
             anomalies=AnomalyDetector(anomaly_cfg, zone_list, alert_engine),
             coverage=CoverageMonitor(coverage_cfg, alert_engine),
+            recorder=_recorder_from_env(),
             status=IngestStatus(),
             area=settings.area if settings else None,
         )
         app.state.runtime = rt
         tasks = [
             asyncio.create_task(
-                run_state(rt.events, rt.store, rt.alerts, rt.anomalies, rt.coverage, rt.hub)
+                run_state(
+                    rt.events, rt.store, rt.alerts, rt.anomalies, rt.coverage, rt.hub, rt.recorder
+                )
             ),
             asyncio.create_task(run_clock(rt.events)),
         ]
+        if rt.recorder is not None:
+            tasks.append(asyncio.create_task(rt.recorder.run()))
         if settings:
             tasks.append(asyncio.create_task(run_ingestion(settings, rt.events, rt.status)))
         yield
@@ -178,8 +210,16 @@ def create_app(
             "aisstream_connected": rt.status.connected,
             "last_message_at": rt.status.last_message_at,
             "reconnects": rt.status.reconnects,
+            # Pipeline: frames from aisstream -> usable positions -> accepted
+            # by the state (the rest: out of order or impossible jumps).
+            "frames_received": rt.status.frames,
+            "positions_parsed": rt.status.positions,
+            "positions_accepted": rt.store.accepted,
+            "rejected_out_of_order": rt.store.out_of_order,
+            "rejected_jumps": rt.store.jumps_rejected,
             "tracks": len(rt.store),
             "live_clients": len(rt.hub),
+            **_recorder_health(rt.recorder),
         }
 
     @app.get("/area")

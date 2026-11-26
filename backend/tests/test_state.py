@@ -103,3 +103,11 @@ def test_long_silent_ship_is_removed_with_history():
     assert result.removed == [263123456]
     assert len(store) == 0
     assert store.history(263123456) is None
+
+
+def test_counters_explain_every_report():
+    store = TrackStore()
+    store.apply(event(lat=37.0, at=T0))  # accepted
+    store.apply(event(lat=37.0, at=T0))  # same time: out of order
+    store.apply(event(lat=38.0, at=T0 + timedelta(seconds=10)))  # 60 nm in 10 s: jump
+    assert (store.accepted, store.out_of_order, store.jumps_rejected) == (1, 1, 1)
