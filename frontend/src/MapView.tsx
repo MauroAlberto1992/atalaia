@@ -38,6 +38,7 @@ function toGeoJSON(tracks: Record<number, Track>): FeatureCollection {
         icon: (isMoving(t) ? "ship-moving" : "ship-stopped") + (t.stale ? "-stale" : ""),
         cog: t.cog,
         stale: t.stale,
+        aisClass: t.ais_class,
       },
     })),
   };
@@ -157,6 +158,8 @@ export function MapView() {
           "icon-rotate": ["get", "cog"],
           "icon-rotation-alignment": "map", // rotate relative to north, not the screen
           "icon-allow-overlap": true, // never hide ships, even when crowded in port
+          // Class B (small craft) drawn smaller, so they read differently at a glance.
+          "icon-size": ["case", ["==", ["get", "aisClass"], "B"], 0.7, 1],
           // Draw live ships on top of stale ones.
           "symbol-sort-key": ["case", ["get", "stale"], 0, 1],
         },

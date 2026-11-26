@@ -4,7 +4,7 @@ import type { Alert, Track } from "./types";
 
 const track = (mmsi: number, latitude = 37): Track => ({
   mmsi, ship_name: "T", latitude, longitude: -8, sog: 0, cog: 0,
-  true_heading: 511, navigational_status: 0, last_seen: "2026-11-24T12:00:00Z",
+  true_heading: 511, navigational_status: 0, last_seen: "2026-11-24T12:00:00Z", ais_class: "A",
   stale: false, distance_nm: 0, avg_speed_kn: 0,
 });
 

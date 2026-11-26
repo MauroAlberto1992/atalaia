@@ -64,6 +64,7 @@ class TrackStore:
             true_heading=event.true_heading,
             navigational_status=event.navigational_status,
             last_seen=event.received_at,
+            ais_class=event.ais_class,
             distance_nm=stats.distance_nm,
             avg_speed_kn=stats.avg_speed_kn,
         )

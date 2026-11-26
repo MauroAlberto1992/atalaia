@@ -55,7 +55,7 @@ def test_migrations_apply_once():
     async def body():
         conn = await fresh_connection()
         try:
-            assert await migrate(conn) == ["001_positions.sql"]
+            assert await migrate(conn) == ["001_positions.sql", "002_ais_class.sql"]
             assert await migrate(conn) == []  # idempotent
             hypertables = await conn.fetchval(
                 "SELECT count(*) FROM timescaledb_information.hypertables"
@@ -105,6 +105,7 @@ def test_recorder_writes_positions_and_ships():
                     true_heading=511,
                     navigational_status=0,
                     last_seen=T0 + timedelta(seconds=10 * s),
+                    ais_class="B" if s == 2 else "A",
                 )
             )
         task = asyncio.create_task(recorder.run())
@@ -115,8 +116,10 @@ def test_recorder_writes_positions_and_ships():
                 await asyncio.sleep(0.1)
             assert recorder.written == 3
             rows = await conn.fetch(
-                "SELECT lat, ST_Y(geom::geometry) AS geom_lat FROM positions ORDER BY time"
+                "SELECT lat, ST_Y(geom::geometry) AS geom_lat, ais_class"
+                " FROM positions ORDER BY time"
             )
+            assert [r["ais_class"] for r in rows] == ["A", "A", "B"]
             assert [round(r["lat"], 3) for r in rows] == [37.0, 37.001, 37.002]
             assert all(abs(r["lat"] - r["geom_lat"]) < 1e-9 for r in rows)  # geom derived
             ship = await conn.fetchrow("SELECT * FROM ships WHERE mmsi = 263000001")

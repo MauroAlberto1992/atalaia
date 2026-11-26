@@ -9,6 +9,7 @@ export interface Track {
   true_heading: number; // 511 = not available
   navigational_status: number;
   last_seen: string; // ISO 8601, UTC
+  ais_class: "A" | "B"; // A = ships, B = small craft (fishing, leisure)
   stale: boolean; // silent for 10+ min
   distance_nm: number; // over the backend's stored history
   avg_speed_kn: number;

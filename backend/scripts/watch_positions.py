@@ -34,7 +34,7 @@ async def main(save: int, minutes: float) -> None:
     subscription = {
         "APIKey": settings.api_key,
         "BoundingBoxes": settings.area.boxes,
-        "FilterMessageTypes": CAPTURE_TYPES if save else ["PositionReport"],
+        "FilterMessageTypes": CAPTURE_TYPES,
     }
     saved: dict[str, int] = dict.fromkeys(CAPTURE_TYPES, 0)
     deadline = time.monotonic() + minutes * 60

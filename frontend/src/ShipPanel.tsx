@@ -31,6 +31,7 @@ export function ShipPanel() {
 
   const rows: [string, string][] = [
     ["MMSI", String(track.mmsi)],
+    ["AIS class", track.ais_class === "B" ? "B (small craft)" : "A"],
     ["Position", `${track.latitude.toFixed(5)}, ${track.longitude.toFixed(5)}`],
     ["Speed", `${track.sog.toFixed(1)} kn`],
     ["Course", track.cog < 360 ? `${track.cog.toFixed(1)}°` : "n/a"],

@@ -9,7 +9,7 @@ history, zones and alerts.
 ![Mini-COP](docs/screenshot.png)
 
 ## What it does
-- **Live AIS ingestion** from aisstream.io over WebSocket.
+- **Live AIS ingestion** from aisstream.io over WebSocket: Class A ships and Class B small craft.
   - Reconnects with backoff and jitter.
   - A watchdog reconnects after 2 minutes of silence.
 - **Track state** for every ship.
