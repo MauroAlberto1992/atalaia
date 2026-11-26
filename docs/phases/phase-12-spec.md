@@ -1,6 +1,6 @@
 # Phase 12 spec — Record every position in a database
 
-Status: proposed, waiting for approval.
+Status: approved.
 
 (Phase 11, the real port list, is in progress on its own branch, waiting for OpenStreetMap access.)
 
@@ -59,3 +59,8 @@ lives only in memory and is lost on restart.
   - `/health` shows the problem;
   - after the database comes back, recording resumes, and the dropped count is reported.
 - All guardrails and CI pass.
+
+## Note: in-process queue, not a message broker
+The queue between the state task and the writer is an `asyncio.Queue` inside the process, like the one between ingestion and state. It exists so that a slow database never blocks the live map.
+
+A message broker (Kafka, RabbitMQ, NATS) is a separate service. It only pays off with several processes or sources: for example sensor fusion with AIS, radar and drone feeds, and several consumers. It is a candidate for a later phase (15), not part of this one.
