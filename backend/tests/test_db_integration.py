@@ -22,8 +22,24 @@ pytestmark = pytest.mark.skipif(not DSN, reason="TEST_DATABASE_URL not set")
 T0 = datetime(2026, 11, 26, 12, 0, tzinfo=UTC)
 
 
+async def connect_when_ready() -> asyncpg.Connection:
+    """The timescaledb-ha image starts a temporary server during first-time
+    init, then restarts it. pg_isready (socket or TCP) reports "ready" during
+    that temporary phase, so a health-checked container can still reset the
+    first connections. Retry for up to 30 s. (The service's Recorder already
+    reconnects with backoff; only these tests connected exactly once.)"""
+    for _ in range(60):
+        try:
+            conn = await asyncpg.connect(DSN, timeout=5)
+            await conn.fetchval("SELECT 1")
+            return conn
+        except (OSError, asyncpg.PostgresError):
+            await asyncio.sleep(0.5)
+    return await asyncpg.connect(DSN, timeout=5)  # last try: let it raise
+
+
 async def fresh_connection() -> asyncpg.Connection:
-    conn = await asyncpg.connect(DSN)
+    conn = await connect_when_ready()
     await conn.execute(
         "DROP TABLE IF EXISTS positions CASCADE; DROP TABLE IF EXISTS ships CASCADE;"
         "DROP TABLE IF EXISTS schema_migrations;"

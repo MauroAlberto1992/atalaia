@@ -55,7 +55,12 @@ class RecordBuffer:
                 track.navigational_status,
             )
         )
-        self._names[track.mmsi] = (track.ship_name, track.last_seen)
+        # Keep the last *known* name: many reports carry no name, and an empty
+        # one must not replace a real one (the SQL upsert only protects names
+        # already in the table, not a ship first written in this batch).
+        previous = self._names.get(track.mmsi)
+        name = track.ship_name or (previous[0] if previous else "")
+        self._names[track.mmsi] = (name, track.last_seen)
 
     def take(self, n: int) -> tuple[list[PositionRow], dict[int, tuple[str, datetime]]]:
         """Remove up to n oldest rows, plus the ship names seen so far."""
