@@ -73,12 +73,20 @@ def _outline(element: dict[str, Any]) -> list[Corner] | None:
 
 
 def _anchor(element: dict[str, Any]) -> tuple[float, float] | None:
-    """A representative point: the node itself, or Overpass' computed centre."""
+    """A representative point: the node itself, Overpass' computed centre, or
+    the middle of the bounds. (With `out geom`, Overpass returns bounds but no
+    centre for relations; the first parser dropped them silently.)"""
     if element["type"] == "node":
         return element["lat"], element["lon"]
     centre = element.get("center")
     if centre:
         return centre["lat"], centre["lon"]
+    bounds = element.get("bounds")
+    if bounds:
+        return (
+            (bounds["minlat"] + bounds["maxlat"]) / 2,
+            (bounds["minlon"] + bounds["maxlon"]) / 2,
+        )
     return None
 
 
