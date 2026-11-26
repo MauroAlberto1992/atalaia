@@ -20,7 +20,18 @@
 - All tests and guardrails pass.
 - **Migration 002 on a compressed chunk:** on a real TimescaleDB, a row 3 days old was inserted, its chunk compressed, then 002 applied. The old row reads `A` and new rows can be `B`. This matters because the developer's database will have compressed chunks.
 - **Browser** (fake backend, 4 Class A and 4 Class B ships side by side): Class B is drawn visibly smaller.
-- **Live run pending**: how many Class B positions and extra ships appear on the real feed.
+- **Live run** (developer's Mac, area `portugal`, about 6.5 min at night, 23:47–23:54 UTC):
+
+  | | Count |
+  |---|---|
+  | positions parsed | 143 |
+  | Class A | 110 (77%) |
+  | **Class B** | **33 (23%)** |
+  | ships on the map | 92 |
+
+  - **Class B adds about 30% more positions** on top of Class A alone, at night, when few small craft are out. A daytime run should show more.
+  - The overall rate was about 0.37 positions/s, against 0.24 in the phase 12 run. Different times, so only indicative.
+  - `db_written` 141 vs `positions_accepted` 143 with 0 queued and 0 dropped: two rows were mid-write when `/health` was read (`take()` removes rows from the buffer before the write completes). That is not a loss. A possible refinement: count in-flight rows separately.
 
 ## What the agent got wrong
 | Problem | How it was caught | What changed |
