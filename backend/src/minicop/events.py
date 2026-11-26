@@ -18,6 +18,7 @@ class PositionEvent(BaseModel):
     navigational_status: int
     ship_name: str
     received_at: datetime  # aisstream's time_utc, timezone-aware (UTC)
+    ais_class: str = "A"  # "A" (ships) or "B" (small craft)
 
 
 class Track(BaseModel):
@@ -33,6 +34,7 @@ class Track(BaseModel):
     true_heading: int
     navigational_status: int
     last_seen: datetime
+    ais_class: str = "A"
     stale: bool = False  # no report for STALE_AFTER (phase 5)
     distance_nm: float = 0.0  # over the stored history
     avg_speed_kn: float = 0.0

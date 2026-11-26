@@ -216,6 +216,8 @@ def create_app(
             # by the state (the rest: out of order or impossible jumps).
             "frames_received": rt.status.frames,
             "positions_parsed": rt.status.positions,
+            "positions_class_a": rt.status.positions_by_class["A"],
+            "positions_class_b": rt.status.positions_by_class["B"],
             "positions_accepted": rt.store.accepted,
             "rejected_out_of_order": rt.store.out_of_order,
             "rejected_jumps": rt.store.jumps_rejected,

@@ -66,6 +66,11 @@ Keep company names out of user-facing text (README, UI); they live here only.
   decisions taken, how to run it, and "What the agent got wrong" (problem,
   how it was caught, what changed). Add each lesson to "Lessons learned" below.
 - Code, comments and documentation in English (chat with the user in Portuguese).
+- When a change adds or changes a dependency (backend/pyproject.toml, frontend/package.json),
+  say so explicitly in the run instructions for the user, with the reinstall command:
+  `cd backend && pip install -e ".[dev]"` and/or `cd frontend && npm install`.
+  Docker rebuilds install everything; the user's local venv does not (phase 12: the
+  pre-commit hooks failed on the user's Mac because asyncpg was missing).
 
 ## Phases
 0. Setup: project structure and CLAUDE.md.
@@ -82,7 +87,8 @@ Keep company names out of user-facing text (README, UI); they live here only.
 10. Coverage gaps: many ships silent together = one coverage alert, not many "dark" alerts.
 11. Real port list from OpenStreetMap (config/ports.json, 359 ports, ODbL).
 12. Record every position in TimescaleDB/PostGIS.
-Next: 13 Class B vessels (in progress), 14 routes from the DB, 15 user-drawn areas.
+13. Class B vessels (small craft): messages 18/19, ais_class everywhere, smaller icon.
+Next: 14 routes from the DB, 15 user-drawn areas.
 
 ## Layout
 ```

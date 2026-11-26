@@ -35,9 +35,13 @@ function toGeoJSON(tracks: Record<number, Track>): FeatureCollection {
       geometry: { type: "Point", coordinates: [t.longitude, t.latitude] }, // GeoJSON: lon first!
       properties: {
         mmsi: t.mmsi,
-        icon: (isMoving(t) ? "ship-moving" : "ship-stopped") + (t.stale ? "-stale" : ""),
+        icon:
+          (isMoving(t) ? "ship-moving" : "ship-stopped") +
+          (t.ais_class === "B" ? "-b" : "") +
+          (t.stale ? "-stale" : ""),
         cog: t.cog,
         stale: t.stale,
+        aisClass: t.ais_class,
       },
     })),
   };
@@ -104,10 +108,14 @@ export function MapView() {
       .catch(() => {}); // keep the default view if the backend is down
 
     map.on("load", () => {
-      for (const stale of [false, true]) {
-        const suffix = stale ? "-stale" : "";
-        map.addImage(`ship-moving${suffix}`, movingIcon(stale), { pixelRatio: ICON_PIXEL_RATIO });
-        map.addImage(`ship-stopped${suffix}`, stoppedIcon(stale), { pixelRatio: ICON_PIXEL_RATIO });
+      // One image per combination: moving/stopped x Class A/B x live/stale.
+      for (const classB of [false, true]) {
+        for (const stale of [false, true]) {
+          const suffix = (classB ? "-b" : "") + (stale ? "-stale" : "");
+          const opts = { pixelRatio: ICON_PIXEL_RATIO };
+          map.addImage(`ship-moving${suffix}`, movingIcon(stale, classB), opts);
+          map.addImage(`ship-stopped${suffix}`, stoppedIcon(stale, classB), opts);
+        }
       }
       map.addSource("ships", { type: "geojson", data: toGeoJSON(useTrackStore.getState().tracks) });
       // Zones, drawn first so they sit under routes and ships.
@@ -157,6 +165,8 @@ export function MapView() {
           "icon-rotate": ["get", "cog"],
           "icon-rotation-alignment": "map", // rotate relative to north, not the screen
           "icon-allow-overlap": true, // never hide ships, even when crowded in port
+          // Class B (small craft) drawn smaller, so they read differently at a glance.
+          "icon-size": ["case", ["==", ["get", "aisClass"], "B"], 0.7, 1],
           // Draw live ships on top of stale ones.
           "symbol-sort-key": ["case", ["get", "stale"], 0, 1],
         },

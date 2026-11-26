@@ -1,0 +1,32 @@
+{
+ "MetaData": {
+  "MMSI": 204706000,
+  "MMSI_String": 204706000,
+  "ShipName": "PAULO DA GAMA",
+  "latitude": 38.53737,
+  "longitude": -28.52803,
+  "time_utc": "2026-11-26 23:39:07.103488269 +0000 UTC"
+ },
+ "MessageType": "PositionReport",
+ "Message": {
+  "PositionReport": {
+   "MessageID": 1,
+   "RepeatIndicator": 0,
+   "UserID": 204706000,
+   "Valid": true,
+   "NavigationalStatus": 0,
+   "RateOfTurn": -128,
+   "Sog": 0,
+   "PositionAccuracy": true,
+   "Longitude": -28.528031666666667,
+   "Latitude": 38.537365,
+   "Cog": 360,
+   "TrueHeading": 511,
+   "Timestamp": 6,
+   "SpecialManoeuvreIndicator": 0,
+   "Spare": 0,
+   "Raim": true,
+   "CommunicationState": 81924
+  }
+ }
+}

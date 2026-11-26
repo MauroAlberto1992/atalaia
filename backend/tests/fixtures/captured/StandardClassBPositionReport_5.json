@@ -1,0 +1,37 @@
+{
+ "MetaData": {
+  "MMSI": 225983284,
+  "MMSI_String": 225983284,
+  "ShipName": "",
+  "latitude": 42.12305,
+  "longitude": -8.84692,
+  "time_utc": "2026-11-26 23:39:32.203537254 +0000 UTC"
+ },
+ "MessageType": "StandardClassBPositionReport",
+ "Message": {
+  "StandardClassBPositionReport": {
+   "AssignedMode": false,
+   "ClassBBand": true,
+   "ClassBDisplay": false,
+   "ClassBDsc": true,
+   "ClassBMsg22": true,
+   "ClassBUnit": true,
+   "Cog": 360,
+   "CommunicationState": 393222,
+   "CommunicationStateIsItdma": true,
+   "Latitude": 42.123045000000005,
+   "Longitude": -8.846921666666667,
+   "MessageID": 18,
+   "PositionAccuracy": false,
+   "Raim": false,
+   "RepeatIndicator": 0,
+   "Sog": 0,
+   "Spare1": 0,
+   "Spare2": 0,
+   "Timestamp": 32,
+   "TrueHeading": 511,
+   "UserID": 225983284,
+   "Valid": true
+  }
+ }
+}

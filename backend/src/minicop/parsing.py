@@ -17,6 +17,14 @@ def has_valid_position(lat: float, lon: float) -> bool:
     return -90 <= lat <= 90 and -180 <= lon <= 180
 
 
+# aisstream message types that carry a position, and the AIS class they come from.
+POSITION_TYPES = {
+    "PositionReport": "A",  # messages 1/2/3
+    "StandardClassBPositionReport": "B",  # message 18
+    "ExtendedClassBPositionReport": "B",  # message 19 (not seen in the captured sample)
+}
+
+
 def parse_position(raw: str | bytes) -> PositionReport | None:
     """Return a PositionReport, or None if the frame is not a usable position."""
     try:
@@ -27,14 +35,16 @@ def parse_position(raw: str | bytes) -> PositionReport | None:
         log.warning("Dropping invalid frame: %s at %s | frame: %.200s", err["msg"], err["loc"], raw)
         return None
 
-    if envelope.message_type != "PositionReport":
+    ais_class = POSITION_TYPES.get(envelope.message_type)
+    if ais_class is None:
         return None
 
     try:
-        report = PositionReport.model_validate(envelope.message["PositionReport"])
+        report = PositionReport.model_validate(envelope.message[envelope.message_type])
     except (KeyError, ValidationError) as exc:
-        log.warning("Dropping malformed PositionReport: %s", exc)
+        log.warning("Dropping malformed %s: %s", envelope.message_type, exc)
         return None
+    report.ais_class = ais_class
 
     if not has_valid_position(report.latitude, report.longitude):
         return None
@@ -79,6 +89,7 @@ def parse_event(raw: str | bytes) -> PositionEvent | None:
         cog=report.cog,
         true_heading=report.true_heading,
         navigational_status=report.navigational_status,
+        ais_class=report.ais_class,
         ship_name=envelope.metadata.ship_name.strip(),  # AIS pads names with spaces
         received_at=received_at,
     )

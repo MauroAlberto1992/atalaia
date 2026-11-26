@@ -1,0 +1,32 @@
+{
+ "MetaData": {
+  "MMSI": 255629000,
+  "MMSI_String": 255629000,
+  "ShipName": "JAIME S             ",
+  "latitude": 41.18493,
+  "longitude": -8.70129,
+  "time_utc": "2026-11-26 23:39:09.098773918 +0000 UTC"
+ },
+ "MessageType": "PositionReport",
+ "Message": {
+  "PositionReport": {
+   "MessageID": 3,
+   "RepeatIndicator": 0,
+   "UserID": 255629000,
+   "Valid": true,
+   "NavigationalStatus": 5,
+   "RateOfTurn": 0,
+   "Sog": 0,
+   "PositionAccuracy": false,
+   "Longitude": -8.701286666666666,
+   "Latitude": 41.184931666666664,
+   "Cog": 321.2,
+   "TrueHeading": 231,
+   "Timestamp": 9,
+   "SpecialManoeuvreIndicator": 0,
+   "Spare": 0,
+   "Raim": false,
+   "CommunicationState": 84858
+  }
+ }
+}

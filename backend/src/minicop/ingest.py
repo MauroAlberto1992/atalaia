@@ -12,7 +12,7 @@ from websockets.asyncio.client import connect
 
 from minicop.config import Settings
 from minicop.events import PositionEvent, Tick
-from minicop.parsing import parse_event
+from minicop.parsing import POSITION_TYPES, parse_event
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ class IngestStatus:
         # Pipeline counters, to tell "the feed sends little" from "we lose data":
         self.frames = 0  # every frame received from aisstream
         self.positions = 0  # frames that parsed into a usable position
+        self.positions_by_class: dict[str, int] = {"A": 0, "B": 0}
 
 
 async def run_ingestion(
@@ -65,7 +66,8 @@ async def run_ingestion(
         {
             "APIKey": settings.api_key,
             "BoundingBoxes": settings.area.boxes,
-            "FilterMessageTypes": ["PositionReport"],
+            # Class A and Class B position messages (phase 13).
+            "FilterMessageTypes": list(POSITION_TYPES),
         }
     )
     backoff = Backoff()
@@ -92,6 +94,7 @@ async def run_ingestion(
                     event: PositionEvent | None = parse_event(frame)
                     if event:
                         status.positions += 1
+                        status.positions_by_class[event.ais_class] += 1
                         await events.put(event)
         except asyncio.CancelledError:
             raise  # shutdown: don't swallow it

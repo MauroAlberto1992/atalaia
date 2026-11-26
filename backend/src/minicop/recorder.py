@@ -28,8 +28,18 @@ BATCH_ROWS = 1000  # write as soon as this many rows are waiting...
 BATCH_SECONDS = 1.0  # ...or at least this often
 MAX_BUFFERED = 200_000  # ~1-2 h of a whole-coast feed while the DB is down
 
-PositionRow = tuple[datetime, int, float, float, float, float, int, int]
-POSITION_COLUMNS = ["time", "mmsi", "lat", "lon", "sog", "cog", "true_heading", "nav_status"]
+PositionRow = tuple[datetime, int, float, float, float, float, int, int, str]
+POSITION_COLUMNS = [
+    "time",
+    "mmsi",
+    "lat",
+    "lon",
+    "sog",
+    "cog",
+    "true_heading",
+    "nav_status",
+    "ais_class",
+]
 
 
 class RecordBuffer:
@@ -53,6 +63,7 @@ class RecordBuffer:
                 track.cog,
                 track.true_heading,
                 track.navigational_status,
+                track.ais_class,
             )
         )
         # Keep the last *known* name: many reports carry no name, and an empty

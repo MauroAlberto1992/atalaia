@@ -9,9 +9,15 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Navigational status "not defined": Class B reports carry no status at all.
+NAV_STATUS_NOT_DEFINED = 15
+
 
 class PositionReport(BaseModel):
-    """AIS message types 1/2/3: a Class A ship reporting where it is."""
+    """A ship reporting where it is. Parsed from Class A messages 1/2/3
+    (`PositionReport`) and from Class B messages 18/19
+    (`StandardClassBPositionReport`, `ExtendedClassBPositionReport`), which
+    share these fields except the navigational status."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -22,8 +28,10 @@ class PositionReport(BaseModel):
     cog: float = Field(alias="Cog")  # course over ground, degrees
     true_heading: int = Field(alias="TrueHeading")  # bow direction; 511 = not available
     # 0 under way, 1 anchored, 5 moored, 7 fishing...
-    navigational_status: int = Field(alias="NavigationalStatus")
+    navigational_status: int = Field(default=NAV_STATUS_NOT_DEFINED, alias="NavigationalStatus")
     timestamp: int = Field(alias="Timestamp")  # UTC second of the minute (0-59)
+    # Not on the wire: set by the parser from the message type.
+    ais_class: str = "A"
 
 
 class MetaData(BaseModel):
