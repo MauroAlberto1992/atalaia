@@ -116,7 +116,15 @@ export function MapView() {
       map.addLayer({ id: "zones-line", type: "line", source: "zones", paint: { "line-color": ZONE_COLOR, "line-width": 1.5, "line-dasharray": [3, 2], "line-opacity": ["case", IS_PORT, 0.4, 1] } });
       map.addLayer({
         id: "zones-label", type: "symbol", source: "zones",
+        filter: ["!", IS_PORT],
         layout: { "text-field": ["get", "name"], "text-size": 11 },
+        paint: { "text-color": ZONE_COLOR, "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
+      });
+      // Port names (hundreds, from OpenStreetMap) only when zoomed in.
+      map.addLayer({
+        id: "ports-label", type: "symbol", source: "zones", minzoom: 12,
+        filter: IS_PORT,
+        layout: { "text-field": ["get", "name"], "text-size": 10 },
         paint: { "text-color": ZONE_COLOR, "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
       });
       fetch("/api/zones")

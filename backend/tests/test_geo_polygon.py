@@ -19,3 +19,11 @@ def test_concave_notch_is_outside():
 
 def test_vertex_order_does_not_matter():
     assert point_in_polygon(5, 5, list(reversed(SQUARE)))
+
+
+def test_distance_to_polygon_edge():
+    from minicop.geo import distance_to_polygon_nm
+
+    # 1 minute of latitude north of a box's top edge = 1 nm.
+    box = [(37.0, -8.1), (37.0, -8.0), (37.1, -8.0), (37.1, -8.1)]
+    assert abs(distance_to_polygon_nm(37.1 + 1 / 60, -8.05, box) - 1.0) < 0.01

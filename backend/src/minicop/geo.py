@@ -19,6 +19,31 @@ def haversine_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * EARTH_RADIUS_NM * math.asin(math.sqrt(a))
 
 
+def distance_to_polygon_nm(lat: float, lon: float, polygon: list[tuple[float, float]]) -> float:
+    """Distance from a point to the nearest edge of a polygon, in nautical
+    miles (0 is not returned for inside points: check point_in_polygon first).
+
+    Uses a local flat projection around the point (1 minute of latitude =
+    1 nm, longitude scaled by cos(lat)), accurate for distances of a few nm.
+    """
+    kx = 60 * math.cos(math.radians(lat))  # nm per degree of longitude here
+    ky = 60.0  # nm per degree of latitude
+    best = math.inf
+    n = len(polygon)
+    for i in range(n):
+        (lat1, lon1), (lat2, lon2) = polygon[i], polygon[(i + 1) % n]
+        # Segment and point in local nm coordinates, with the point at the origin.
+        ax, ay = (lon1 - lon) * kx, (lat1 - lat) * ky
+        bx, by = (lon2 - lon) * kx, (lat2 - lat) * ky
+        dx, dy = bx - ax, by - ay
+        length2 = dx * dx + dy * dy
+        # Closest point on the segment to the origin, clamped to its ends.
+        t = 0.0 if length2 == 0 else max(0.0, min(1.0, -(ax * dx + ay * dy) / length2))
+        cx, cy = ax + t * dx, ay + t * dy
+        best = min(best, math.hypot(cx, cy))
+    return best
+
+
 def point_in_polygon(lat: float, lon: float, polygon: list[tuple[float, float]]) -> bool:
     """Ray casting: cast a ray from the point towards +longitude and count how
     many polygon edges it crosses. Odd = inside. Works for concave polygons.

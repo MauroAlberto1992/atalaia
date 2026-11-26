@@ -23,6 +23,7 @@ from minicop.events import PositionEvent, Tick, Track
 from minicop.history import HistoryPoint, HistoryStats
 from minicop.hub import Hub
 from minicop.ingest import IngestStatus, run_ingestion
+from minicop.ports import load_ports
 from minicop.recorder import Recorder
 from minicop.state import TrackStore
 from minicop.zones import Zone, load_zones
@@ -161,7 +162,8 @@ def create_app(
 ) -> FastAPI:
     """ingest=False skips aisstream (and the API key); tests feed
     app.state.runtime.events. zones defaults to config/zones.toml; tests pass their own."""
-    zone_list = load_zones() if zones is None else zones
+    # Alert zones from zones.toml, plus port areas from OpenStreetMap (ports.json).
+    zone_list = load_zones() + load_ports() if zones is None else zones
     anomaly_cfg = load_anomaly_config() if anomaly_config is None else anomaly_config
     coverage_cfg = load_coverage_config() if coverage_config is None else coverage_config
 

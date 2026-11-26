@@ -59,6 +59,16 @@
   - `rejected_out_of_order` and `rejected_jumps`: positions the state rejected.
 
   Each step should be close to the previous one, and `db_written` close to `positions_accepted`.
+- **Counters on live data** (developer's Mac, area `portugal`, about 13.5 min, 23:11–23:24 UTC):
+
+  | Step | Count |
+  |---|---|
+  | `frames_received` | 197 |
+  | `positions_parsed` | 196 (the 1 missing is the `SubscriptionConfirmation` frame) |
+  | `positions_accepted` | 196 (0 out of order, 0 jumps) |
+  | `db_written` | 196 (0 queued, 0 dropped) |
+
+  **No loss anywhere in the pipeline.** The low rate (about 0.24 frames/s for the whole coast at night) is the source, not our code.
   This was not in the spec; it was added after the live run showed fewer rows than expected.
 
 ## Deviation from the spec

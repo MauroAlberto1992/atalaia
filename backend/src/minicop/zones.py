@@ -1,5 +1,6 @@
 """Zones of interest, loaded from config/zones.toml."""
 
+import math
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field, PrivateAttr, computed_field
 
 from minicop.config import BACKEND_DIR, Corner
-from minicop.geo import point_in_polygon
+from minicop.geo import distance_to_polygon_nm, point_in_polygon
 
 DEFAULT_ZONES_FILE = BACKEND_DIR / "config" / "zones.toml"
 
@@ -34,6 +35,19 @@ class Zone(BaseModel):
     @property
     def bbox(self) -> tuple[Corner, Corner]:
         return self._bbox
+
+    def near(self, lat: float, lon: float, margin_nm: float) -> bool:
+        """Inside the polygon, or within margin_nm of its edge."""
+        (lat_min, lon_min), (lat_max, lon_max) = self.bbox
+        dlat = margin_nm / 60
+        dlon = margin_nm / (60 * math.cos(math.radians(lat)))
+        if not (
+            lat_min - dlat <= lat <= lat_max + dlat and lon_min - dlon <= lon <= lon_max + dlon
+        ):
+            return False
+        return point_in_polygon(lat, lon, self.polygon) or (
+            distance_to_polygon_nm(lat, lon, self.polygon) <= margin_nm
+        )
 
     def contains(self, lat: float, lon: float) -> bool:
         # Cheap rectangle check first; most ships are far from most zones.
