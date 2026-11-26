@@ -1,6 +1,6 @@
 # Phase 13 spec — Class B vessels (small boats)
 
-Status: proposed, waiting for approval.
+Status: approved.
 
 (Renumbering: "routes from the database" moves to phase 14 and "user-drawn
 areas" to phase 15.)
