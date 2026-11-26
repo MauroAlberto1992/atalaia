@@ -94,9 +94,11 @@ def test_config_zones_load():
     assert not ria.contains(36.9, -7.9)  # open sea south of it
 
 
-def test_no_dark_alert_inside_a_port():
+def test_no_dark_alert_in_a_port_even_inside_another_zone():
+    """Phase 11 change: switching AIS off in (or next to) a port is normal, so
+    no "dark" at all there. (Before, a ship inside both a port and a restricted
+    zone still went "dark" for the restricted zone.)"""
     port = Zone(name="P", kind="port", polygon=BOX)
     e = AlertEngine([port, RESTRICTED])
     e.on_track(track(INSIDE))
-    # Inside both zones: dark only for the restricted one, not the port.
-    assert [a.zone for a in e.on_stale(track(INSIDE), T0)] == ["R"]
+    assert e.on_stale(track(INSIDE), T0) == []

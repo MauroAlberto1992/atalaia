@@ -80,8 +80,9 @@ Keep company names out of user-facing text (README, UI); they live here only.
 8. Docker: `docker compose up --build` -> http://localhost:8080.
 9. Anomaly detection: loitering, rendezvous, reappearance after AIS gaps, spoofing.
 10. Coverage gaps: many ships silent together = one coverage alert, not many "dark" alerts.
-11. Real port list from OpenStreetMap (branch claude/real-port-list, waiting for Overpass access).
-12. Record every position in TimescaleDB/PostGIS. Next: 13 routes from the DB, 14 user-drawn areas.
+11. Real port list from OpenStreetMap (config/ports.json, 359 ports, ODbL).
+12. Record every position in TimescaleDB/PostGIS.
+Next: 13 Class B vessels (in progress), 14 routes from the DB, 15 user-drawn areas.
 
 ## Layout
 ```
@@ -110,6 +111,8 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
 - SPA fallbacks (`try_files ... /index.html`) can hide missing files behind a 200; assets must 404.
 - Logs for dropped data say where and include a truncated sample.
 - Geographic or domain data needs a source, or is labelled as demo in the UI itself.
+  Memory is not a reference, not even for test coordinates (they were 66-560 m off).
+- Inspect real exported data before trusting a parser written from docs (Overpass relations had no centre).
 - Claims in docs (e.g. "precomputed") are checked against the code in review.
 - Declare every package the code imports; no reliance on transitive dependencies.
 - Kill old dev servers before testing; use strict ports.
