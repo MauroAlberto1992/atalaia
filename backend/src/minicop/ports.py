@@ -23,6 +23,12 @@ DEFAULT_PORTS_FILE = BACKEND_DIR / "config" / "ports.json"
 POINT_RADIUS_NM = 0.5
 # Points closer than this to another port are the same place mapped twice.
 MERGE_DISTANCE_NM = 0.5
+# OSM port outlines are mostly land (terminals, quays); ships sit in the water
+# next to them (basins, docks, alongside). A ship this close to a port outline
+# counts as "in port". Trade-off: next to a small port it also covers some
+# open water. Found on live data: a ship in Leixões basin was outside every
+# terminal polygon.
+PORT_MARGIN_NM = 0.3
 
 
 class Port(BaseModel):

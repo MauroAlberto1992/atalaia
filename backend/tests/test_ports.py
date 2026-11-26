@@ -81,3 +81,58 @@ def test_ports_load_as_alert_free_zones():
     lat = sum(p[0] for p in funchal.polygon) / len(funchal.polygon)
     lon = sum(p[1] for p in funchal.polygon) / len(funchal.polygon)
     assert point_in_polygon(lat, lon, funchal.polygon)
+
+
+# ---- "in port" margin (found live: a ship in Leixões basin, outside every
+# terminal polygon). Points derived from the data, not from memory.
+LEIXOES_PESCA = "way/699952409"  # "Porto de Pesca", Leixões
+
+
+def _leixoes_points() -> tuple[tuple[float, float], tuple[float, float]]:
+    ports = json.loads(DEFAULT_PORTS_FILE.read_text())["ports"]
+    pesca = next(p for p in ports if p["osm"] == LEIXOES_PESCA)
+    west = min(pesca["polygon"], key=lambda v: v[1])  # its most seaward vertex
+    basin = (west[0], west[1] - 0.003)  # ~0.14 nm west, in the basin water
+    open_sea = (west[0], west[1] - 0.07)  # ~2.7 nm west, open sea
+    return basin, open_sea
+
+
+def test_ship_in_leixoes_basin_is_near_a_port_but_inside_none():
+    from minicop.ports import PORT_MARGIN_NM
+
+    basin, open_sea = _leixoes_points()
+    zones = load_ports()
+    assert not any(z.contains(*basin) for z in zones)  # the problem seen live
+    assert any(z.near(*basin, PORT_MARGIN_NM) for z in zones)  # the fix
+    assert not any(z.near(*open_sea, PORT_MARGIN_NM) for z in zones)
+
+
+def test_no_rendezvous_in_leixoes_basin():
+    from datetime import UTC, datetime, timedelta
+
+    from minicop.alerts import AlertEngine
+    from minicop.anomalies import AnomalyDetector, load_anomaly_config
+    from minicop.events import Track
+
+    basin, _ = _leixoes_points()
+    zones = load_ports()
+    det = AnomalyDetector(load_anomaly_config(), zones, AlertEngine(zones))
+    t0 = datetime(2026, 11, 26, 23, 0, tzinfo=UTC)
+    alerts = []
+    for m in range(16):  # two slow ships side by side for 15 min
+        for mmsi, dlon in ((1, 0.0), (2, 0.001)):
+            alerts += det.on_track(
+                Track(
+                    mmsi=mmsi,
+                    ship_name=f"S{mmsi}",
+                    latitude=basin[0],
+                    longitude=basin[1] + dlon,
+                    sog=0.3,
+                    cog=0,
+                    true_heading=511,
+                    navigational_status=0,
+                    last_seen=t0 + timedelta(minutes=m, seconds=mmsi),
+                ),
+                None,
+            )
+    assert alerts == []

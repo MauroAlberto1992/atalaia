@@ -14,6 +14,7 @@ from enum import StrEnum
 from pydantic import BaseModel
 
 from minicop.events import Track
+from minicop.ports import PORT_MARGIN_NM
 from minicop.zones import Zone
 
 MAX_ALERTS = 200
@@ -138,7 +139,13 @@ class AlertEngine:
     def on_stale(self, track: Track, now: datetime) -> list[Alert]:
         """A ship stopped transmitting. Alert for each zone it was last seen in."""
         name = track.ship_name or str(track.mmsi)
-        # Switching AIS off in port is normal, so port areas don't count.
+        # Switching AIS off in port is normal: no "dark" alert in or next to a
+        # port (same margin as for anomalies), even inside another zone.
+        if any(
+            z.kind == "port" and z.near(track.latitude, track.longitude, PORT_MARGIN_NM)
+            for z in self._zones
+        ):
+            return []
         ports = {z.name for z in self._zones if z.kind == "port"}
         return [
             self._raise(AlertKind.DARK, track, zone, now, f"{name} went dark inside {zone}")

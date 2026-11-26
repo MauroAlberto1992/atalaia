@@ -9,10 +9,15 @@
   - **De-duplication:** a point inside a mapped outline, or within 0.5 nm of another kept point, is dropped.
   - `load_ports()` returns them as `kind = "port"` zones, which raise no alerts themselves and suppress loitering, rendezvous and "dark" alerts.
 - **`scripts/fetch_ports.py`**: queries Overpass, or reads an export with `--from-file`. `--print-query` prints the query used.
+- **"In port" = inside a port outline or within 0.3 nm (about 550 m) of it** (`Zone.near`, `PORT_MARGIN_NM`).
+  - OSM outlines are mostly land (terminals, quays); ships sit in the water next to them.
+  - The edge distance is computed in a local flat projection, after a bounding-box check widened by the margin.
+  - It is used for loitering, rendezvous and "dark".
+- **"Dark" alerts are now suppressed in or next to any port, even inside another zone.** Before, a ship in both a port and a restricted zone still went "dark" for the restricted zone; switching AIS off in port is normal either way.
 - **The 7 hand-drawn demo ports were removed** from `zones.toml`. The other demo zones stay.
 - **Map:** port names have their own layer, shown from zoom 12 only (there are hundreds).
 - **Pre-commit:** `backend/data/` (raw exports) is excluded from the end-of-file and whitespace fixers, so exports are kept byte for byte.
-- **Tests:** 7 new tests on a fixture of **3 genuine elements from the export** (a way, a node, a relation), plus validation of the committed file.
+- **Tests:** 11 new tests (including the Leixões basin case, rendezvous suppression in the basin, and polygon edge distance); first on a fixture of **3 genuine elements from the export** (a way, a node, a relation), plus validation of the committed file.
 
 ## Deviations from the spec
 - **Overpass couldn't be reached from the development environment.** The host was allowed, but the connection was reset for about 2 h, while other newly allowed hosts worked within a minute. The developer ran the query on https://overpass-turbo.eu and committed the raw export (`backend/data/osm/ports-raw.json`). The script gained `--from-file` for this.
@@ -26,6 +31,7 @@
 | The first Overpass query missed major fishing and commercial ports (Peniche not present at all). | A coverage check against known ports. | Wider query; a test that named major ports are present. |
 | **Coverage was checked with port coordinates written from memory**, 66–560 m off, so it reported 8 of 15 ports "missing". With the wider export, all 8 turned out to be present. | Measuring the distance from each "missing" point to the nearest port before concluding. | Coverage is tested by names from the data. Lesson: memory is not a reference, not even for test data (same root cause as the Ria Formosa polygon in phase 6). |
 | Assumed the moored rendezvous pair was at Ericeira from a ship's name. | Rereading what the developer actually said. | The assumption is stated, and the test was not built on it. |
+| Didn't anticipate that OSM port outlines are land (terminals, quays) and not water: a ship in Leixões basin was outside every port polygon, so in-port alerts were still possible. | **The developer's screenshot** of Leixões on live data. | A 0.3 nm "near port" margin; tests with a basin point derived from the OSM data (0.14 nm from the Porto de Pesca outline) and an open-sea control point. |
 | A test assertion that could never fail (`x in (True, False)`). | Agent review before committing. | Replaced by a real check (the port polygon contains its centroid). |
 
 ## How to run

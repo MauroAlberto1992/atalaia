@@ -25,6 +25,7 @@ from minicop.config import BACKEND_DIR
 from minicop.events import PositionEvent, Track
 from minicop.geo import haversine_nm
 from minicop.history import ShipHistory
+from minicop.ports import PORT_MARGIN_NM
 from minicop.zones import Zone
 
 DEFAULT_ANOMALIES_FILE = BACKEND_DIR / "config" / "anomalies.toml"
@@ -287,7 +288,7 @@ class AnomalyDetector:
     # ---- helpers ------------------------------------------------------------
 
     def _in_port(self, lat: float, lon: float) -> bool:
-        return any(z.contains(lat, lon) for z in self._ports)
+        return any(z.near(lat, lon, PORT_MARGIN_NM) for z in self._ports)
 
     @staticmethod
     def _name(track: Track) -> str:
