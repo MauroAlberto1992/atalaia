@@ -1,6 +1,6 @@
 # Phase 11 spec — Real port list from OpenStreetMap
 
-Status: proposed, waiting for approval.
+Status: approved.
 
 ## Problem
 The port areas used to suppress loitering, rendezvous and "dark" alerts are 7
