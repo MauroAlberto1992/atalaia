@@ -33,7 +33,8 @@ export interface Zone {
 // Mirrors backend/src/minicop/alerts.py::Alert.
 export interface Alert {
   id: number;
-  kind: "enter" | "exit" | "speeding" | "dark" | "loitering" | "rendezvous" | "reappeared" | "spoofing";
+  kind: "enter" | "exit" | "speeding" | "dark" | "loitering" | "rendezvous" | "reappeared" | "spoofing"
+    | "coverage_lost" | "coverage_restored";
   mmsi: number;
   ship_name: string;
   zone: string | null; // null for behavioural anomalies

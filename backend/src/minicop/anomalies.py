@@ -40,6 +40,9 @@ LAST_SEEN_MEMORY = timedelta(hours=24)
 # 0.01° of latitude is 0.6 nm, 0.01° of longitude is 0.48 nm at 37°N
 # and still 0.45 nm at 42°N.
 GRID_DEG = 0.01
+# AIS navigational status "moored": two ships moored together is not a
+# rendezvous. "At anchor" (1) still counts: transfers are often done at anchor.
+MOORED = 5
 
 
 class AnomalyConfig(BaseModel):
@@ -85,10 +88,15 @@ class AnomalyDetector:
 
     # ---- entry points (called by the state task) ---------------------------
 
-    def on_track(self, track: Track, history: ShipHistory | None) -> list[Alert]:
-        """A ship's track was updated (an accepted position)."""
+    def on_track(
+        self, track: Track, history: ShipHistory | None, silence_was_coverage: bool = False
+    ) -> list[Alert]:
+        """A ship's track was updated (an accepted position).
+        `silence_was_coverage`: its last silence was part of a coverage gap,
+        so coming back is not a 'reappeared' anomaly."""
         out: list[Alert] = []
-        out += self._check_reappeared(track)
+        if not silence_was_coverage:
+            out += self._check_reappeared(track)
         self._latest[track.mmsi] = track
         self._last_seen[track.mmsi] = track
         self._move_in_grid(track)
@@ -199,14 +207,17 @@ class AnomalyDetector:
         a = track.mmsi
         out: list[Alert] = []
         close_now: set[int] = set()
-        if track.sog < cfg.rendezvous_max_speed_kn and not self._in_port(
-            track.latitude, track.longitude
+        if (
+            track.sog < cfg.rendezvous_max_speed_kn
+            and track.navigational_status != MOORED
+            and not self._in_port(track.latitude, track.longitude)
         ):
             for b in self.neighbours(a):
                 other = self._latest[b]
                 if (
                     track.last_seen - other.last_seen <= PARTNER_MAX_AGE
                     and other.sog < cfg.rendezvous_max_speed_kn
+                    and other.navigational_status != MOORED
                     and haversine_nm(
                         track.latitude, track.longitude, other.latitude, other.longitude
                     )

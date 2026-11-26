@@ -9,11 +9,12 @@ const alert = (id: number, kind: Alert["kind"]): Alert => ({
 
 const ALL: Alert[] = [
   alert(1, "enter"), alert(2, "dark"), alert(3, "loitering"), alert(4, "spoofing"), alert(5, "speeding"),
+  alert(6, "coverage_lost"),
 ];
 
 describe("alert filter", () => {
   it("counts alerts per group", () => {
-    expect(countByGroup(ALL)).toEqual({ zones: 3, behaviour: 2 });
+    expect(countByGroup(ALL)).toEqual({ zones: 3, behaviour: 2, system: 1 });
   });
 
   it("shows only the selected groups, keeping order", () => {

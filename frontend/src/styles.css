@@ -57,6 +57,7 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .chip[aria-pressed="true"] { color: var(--text); background: rgba(148, 163, 184, 0.15); border-color: #475569; }
 .chip.zones[aria-pressed="true"] { border-color: #f97316; }
 .chip.behaviour[aria-pressed="true"] { border-color: #a78bfa; }
+.chip.system[aria-pressed="true"] { border-color: #94a3b8; }
 .alerts .empty { padding: 8px 12px; color: var(--muted); }
 .alerts ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 .alert {
@@ -72,6 +73,8 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .alert.loitering .icon, .alert.rendezvous .icon { color: #a78bfa; }
 .alert.reappeared .icon { color: #38bdf8; }
 .alert.spoofing .icon { color: #f43f5e; }
+.alert.coverage_lost .icon { color: #94a3b8; }
+.alert.coverage_restored .icon { color: #22c55e; }
 
 @media (max-width: 600px) {
   .alerts { bottom: auto; top: 56px; max-height: 25vh; }

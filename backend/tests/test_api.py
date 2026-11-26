@@ -115,3 +115,27 @@ def test_alert_on_live_and_in_alerts_endpoint():
         # A new client gets the alert in its snapshot.
         with client.websocket_connect("/live") as ws:
             assert len(ws.receive_json()["alerts"]) == 1
+
+
+def test_coverage_gap_replaces_dark_alerts_end_to_end():
+    app = create_app(ingest=False, zones=[ZONE])
+    with TestClient(app) as client:
+        # 5 ships inside zone Z, all silent at the same moment.
+        client.portal.call(feed, app, *[event(m) for m in range(1, 6)])
+        t0 = event(1).received_at
+        for seconds in (600, 630, 660, 690, 720, 750):  # sweeps after 10 min
+            client.portal.call(feed, app, Tick(now=t0 + timedelta(seconds=seconds)))
+        kinds = [a["kind"] for a in client.get("/alerts").json()]
+        assert kinds.count("coverage_lost") == 1
+        assert "dark" not in kinds
+
+
+def test_lone_ship_still_goes_dark_end_to_end():
+    app = create_app(ingest=False, zones=[ZONE])
+    with TestClient(app) as client:
+        client.portal.call(feed, app, event(1))
+        t0 = event(1).received_at
+        for seconds in (600, 630, 660, 690, 720, 750):
+            client.portal.call(feed, app, Tick(now=t0 + timedelta(seconds=seconds)))
+        kinds = [a["kind"] for a in client.get("/alerts").json()]
+        assert "dark" in kinds and "coverage_lost" not in kinds

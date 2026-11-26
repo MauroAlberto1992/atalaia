@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from minicop.alerts import Alert, AlertEngine
 from minicop.anomalies import AnomalyConfig, AnomalyDetector, load_anomaly_config
 from minicop.config import Area, load_settings
+from minicop.coverage import CoverageConfig, CoverageMonitor, load_coverage_config
 from minicop.events import PositionEvent, Tick, Track
 from minicop.history import HistoryPoint, HistoryStats
 from minicop.hub import Hub
@@ -44,6 +45,7 @@ async def run_state(
     store: TrackStore,
     engine: AlertEngine,
     anomalies: AnomalyDetector,
+    coverage: CoverageMonitor,
     hub: Hub,
 ) -> None:
     """The only task that mutates the store, the alert engine and the anomaly detector.
@@ -59,15 +61,24 @@ async def run_state(
             if isinstance(event, Tick):
                 result = store.sweep(event.now)
                 for mmsi in result.stale:
-                    hub.publish({"type": "stale", "mmsi": mmsi})
+                    hub.publish({"type": "stale", "mmsi": mmsi})  # map greys it now
                     track = store.get(mmsi)
                     if track is not None:
-                        publish_alerts(engine.on_stale(track, event.now))
+                        coverage.add_stale(track, event.now)
+                # Coverage gaps first; "dark" alerts only for ships that went
+                # silent on their own (released after the cohort window).
+                gap_alerts, released = coverage.process(event.now)
+                publish_alerts(gap_alerts)
+                for silent in released:
+                    current = store.get(silent.mmsi)
+                    if current is not None and current.stale:
+                        publish_alerts(engine.on_stale(current, event.now))
                 for removed in result.removed_tracks:
                     engine.on_removed(removed.mmsi)
                     anomalies.on_removed(removed)
                     hub.publish({"type": "remove", "mmsi": removed.mmsi})
                 anomalies.on_tick(event.now)
+                coverage.on_tick(event.now)
             else:
                 track = store.apply(event)
                 if track is not None:
@@ -75,7 +86,13 @@ async def run_state(
                     # by the time it shows an alert about it.
                     hub.publish({"type": "track", "track": track.model_dump(mode="json")})
                     publish_alerts(engine.on_track(track))
-                    publish_alerts(anomalies.on_track(track, store.history(track.mmsi)))
+                    restored, in_gap = coverage.on_track(track)
+                    publish_alerts(restored)
+                    publish_alerts(
+                        anomalies.on_track(
+                            track, store.history(track.mmsi), silence_was_coverage=in_gap
+                        )
+                    )
                 # Every report, accepted or rejected, can count towards spoofing.
                 window = timedelta(minutes=anomalies.cfg.spoof_window_min)
                 jumps = store.jumps_since(event.mmsi, event.received_at - window)
@@ -104,6 +121,7 @@ class Runtime:
     hub: Hub
     alerts: AlertEngine
     anomalies: AnomalyDetector
+    coverage: CoverageMonitor
     status: IngestStatus
     area: Area | None
 
@@ -112,11 +130,13 @@ def create_app(
     ingest: bool = True,
     zones: list[Zone] | None = None,
     anomaly_config: AnomalyConfig | None = None,
+    coverage_config: CoverageConfig | None = None,
 ) -> FastAPI:
     """ingest=False skips aisstream (and the API key); tests feed
     app.state.runtime.events. zones defaults to config/zones.toml; tests pass their own."""
     zone_list = load_zones() if zones is None else zones
     anomaly_cfg = load_anomaly_config() if anomaly_config is None else anomaly_config
+    coverage_cfg = load_coverage_config() if coverage_config is None else coverage_config
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -128,12 +148,15 @@ def create_app(
             hub=Hub(),
             alerts=alert_engine,
             anomalies=AnomalyDetector(anomaly_cfg, zone_list, alert_engine),
+            coverage=CoverageMonitor(coverage_cfg, alert_engine),
             status=IngestStatus(),
             area=settings.area if settings else None,
         )
         app.state.runtime = rt
         tasks = [
-            asyncio.create_task(run_state(rt.events, rt.store, rt.alerts, rt.anomalies, rt.hub)),
+            asyncio.create_task(
+                run_state(rt.events, rt.store, rt.alerts, rt.anomalies, rt.coverage, rt.hub)
+            ),
             asyncio.create_task(run_clock(rt.events)),
         ]
         if settings:

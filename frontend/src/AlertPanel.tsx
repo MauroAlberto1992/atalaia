@@ -19,9 +19,11 @@ const ICON: Record<Alert["kind"], string> = {
   rendezvous: "⇄",
   reappeared: "◉",
   spoofing: "⚠",
+  coverage_lost: "⊘",
+  coverage_restored: "⊕",
 };
 
-const GROUP_LABEL: Record<AlertGroup, string> = { zones: "Zones", behaviour: "Behaviour" };
+const GROUP_LABEL: Record<AlertGroup, string> = { zones: "Zones", behaviour: "Behaviour", system: "System" };
 
 function hhmm(iso: string): string {
   // 24h clock: compact and unambiguous in an operations view.

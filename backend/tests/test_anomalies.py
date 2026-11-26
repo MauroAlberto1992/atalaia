@@ -247,3 +247,33 @@ def test_two_transmitters_with_one_mmsi_through_the_store():
 @pytest.mark.parametrize("kind", ["enter", "loitering", "rendezvous", "reappeared", "spoofing"])
 def test_alert_kinds_serialise(kind):
     assert AlertKind(kind).value == kind
+
+
+def test_moored_ships_together_are_not_rendezvous():
+    det, alerts = detector(), []
+    b_pos = offset(*OFFSHORE, 0.0, 0.02)
+    for m in range(16):
+        t = T0 + timedelta(minutes=m)
+        moored_a = track(1, *OFFSHORE, t, sog=0.0).model_copy(update={"navigational_status": 5})
+        alerts += det.on_track(moored_a, None)
+        alerts += det.on_track(track(2, *b_pos, t + timedelta(seconds=5), sog=0.0), None)
+    assert alerts == []
+
+
+def test_ships_at_anchor_together_still_count():
+    det, alerts = detector(), []
+    b_pos = offset(*OFFSHORE, 0.0, 0.05)
+    for m in range(16):
+        t = T0 + timedelta(minutes=m)
+        a = track(1, *OFFSHORE, t, sog=0.0).model_copy(update={"navigational_status": 1})
+        b = track(2, *b_pos, t + timedelta(seconds=5), sog=0.0)
+        alerts += det.on_track(a, None)
+        alerts += det.on_track(b.model_copy(update={"navigational_status": 1}), None)
+    assert kinds(alerts) == [AlertKind.RENDEZVOUS]
+
+
+def test_reappearance_is_suppressed_after_a_coverage_gap():
+    det = detector()
+    det.on_track(track(1, *OFFSHORE, T0), None)
+    back = track(1, *OFFSHORE, T0 + timedelta(minutes=45))
+    assert det.on_track(back, None, silence_was_coverage=True) == []
