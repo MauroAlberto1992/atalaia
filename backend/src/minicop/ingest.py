@@ -53,6 +53,9 @@ class IngestStatus:
         self.connected = False
         self.last_message_at: datetime | None = None
         self.reconnects = 0
+        # Pipeline counters, to tell "the feed sends little" from "we lose data":
+        self.frames = 0  # every frame received from aisstream
+        self.positions = 0  # frames that parsed into a usable position
 
 
 async def run_ingestion(
@@ -80,6 +83,7 @@ async def run_ingestion(
                     # arrives (e.g. a dead NAT mapping). Treat silence as failure.
                     frame = await asyncio.wait_for(ws.recv(), SILENCE_TIMEOUT_S)
                     status.last_message_at = datetime.now(UTC)
+                    status.frames += 1
                     if isinstance(frame, bytes):
                         frame = frame.decode()
                     if frame.startswith('{"error"'):
@@ -87,6 +91,7 @@ async def run_ingestion(
                         break  # aisstream closes after an error; reconnect below
                     event: PositionEvent | None = parse_event(frame)
                     if event:
+                        status.positions += 1
                         await events.put(event)
         except asyncio.CancelledError:
             raise  # shutdown: don't swallow it

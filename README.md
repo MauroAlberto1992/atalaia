@@ -51,7 +51,7 @@ You need an API key from https://aisstream.io.
 
 ### With Docker (simplest)
 ```bash
-cp .env.example .env        # set AISSTREAM_API_KEY
+cp .env.example .env        # set AISSTREAM_API_KEY and POSTGRES_PASSWORD
 docker compose up --build   # open http://localhost:8080
 ```
 
@@ -108,7 +108,7 @@ The real value is correlating it with detections that don't depend on the ship: 
 
 This is the "data fusion" part of a real Common Operational Picture, and it reuses the architecture as is: one more ingestion task feeding the same queue.
 
-### Persistence: a database
+### Persistence: a database (recording done in phase 12)
 - **PostgreSQL + PostGIS** (or TimescaleDB) for positions, tracks and alerts.
 - History survives restarts and is no longer capped at 2000 points per ship.
 - Replay a past time window on the map ("what happened here last night?").

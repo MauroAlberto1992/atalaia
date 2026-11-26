@@ -1,9 +1,31 @@
 # Run everything: docker compose up --build   ->  http://localhost:8080
 services:
+  db:
+    # PostgreSQL 17 + TimescaleDB 2.32 + PostGIS. Exact tag: no surprise upgrades.
+    image: timescale/timescaledb-ha:pg17.12-ts2.32.1
+    environment:
+      POSTGRES_DB: minicop
+      # From .env, never committed. Compose stops with this message if unset.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/home/postgres/pgdata  # data survives restarts and rebuilds
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "minicop"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    # Not published to the host: only the backend talks to it.
+
   backend:
     build: ./backend
     # The API key is passed at runtime from .env; it is never part of an image.
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/minicop
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     # Not published to the host: only the frontend (nginx) talks to it.
 
@@ -15,3 +37,6 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -31,6 +31,10 @@ class TrackStore:
         self._history: dict[int, ShipHistory] = {}
         # Times of rejected position jumps per ship, for spoofing detection.
         self._jumps: dict[int, deque[datetime]] = {}
+        # Counters for /health: why reports did or didn't change a track.
+        self.accepted = 0
+        self.out_of_order = 0
+        self.jumps_rejected = 0
 
     def apply(self, event: PositionEvent) -> Track | None:
         """Update the ship's track. Returns the new Track, or None if nothing
@@ -38,11 +42,13 @@ class TrackStore:
         order) or its position was rejected as a GPS jump."""
         current = self._tracks.get(event.mmsi)
         if current is not None and event.received_at <= current.last_seen:
+            self.out_of_order += 1
             return None
 
         history = self._history.setdefault(event.mmsi, ShipHistory())
         if history.add(event.latitude, event.longitude, event.received_at) is AddResult.JUMP:
             self._jumps.setdefault(event.mmsi, deque(maxlen=50)).append(event.received_at)
+            self.jumps_rejected += 1
             return None  # don't move the ship on the map to a glitch position
         # JITTER still updates the track: speed, status and last_seen are fresh.
         stats = history.stats()
@@ -62,6 +68,7 @@ class TrackStore:
             avg_speed_kn=stats.avg_speed_kn,
         )
         self._tracks[event.mmsi] = track
+        self.accepted += 1
         return track
 
     def sweep(self, now: datetime) -> SweepResult:

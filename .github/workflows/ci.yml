@@ -8,6 +8,19 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    # Real TimescaleDB + PostGIS for the integration tests (same image as compose).
+    services:
+      db:
+        image: timescale/timescaledb-ha:pg17.12-ts2.32.1
+        env:
+          POSTGRES_DB: minicop_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:ci-only-password@localhost:5432/minicop_test
     defaults:
       run:
         working-directory: backend
@@ -47,13 +60,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: printf 'AISSTREAM_API_KEY=dummy-key-for-smoke-test\nMINICOP_AREA=algarve\n' > .env
+      - run: printf 'AISSTREAM_API_KEY=dummy-key-for-smoke-test\nMINICOP_AREA=algarve\nPOSTGRES_PASSWORD=ci-only-password\n' > .env
       - run: docker compose up --build --detach --wait --wait-timeout 120
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install websockets
       - run: python scripts/smoke_test.py http://localhost:8080
+      # The backend reached the database and applied the migrations. (No rows
+      # are written here: with a dummy key there is no AIS feed.)
+      - name: Backend is connected to the database
+        run: |
+          # The recorder connects right after startup; allow it up to 30 s.
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8080/api/health \
+              | python -c "import json,sys; sys.exit(0 if json.load(sys.stdin).get('db_connected') else 1)"; then
+              echo "db_connected after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          curl -s http://localhost:8080/api/health; exit 1
       # A real browser against the production images: the HTTP smoke test
       # passed while the map was blank (missing / mistyped MapLibre worker).
       - uses: actions/setup-node@v4

@@ -11,6 +11,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 COPY config ./config
+COPY migrations ./migrations
 # Editable install on purpose: the code finds config/ relative to its source
 # folder (minicop/config.py -> /app/config). A regular install would move the
 # code into site-packages and lose that path.
