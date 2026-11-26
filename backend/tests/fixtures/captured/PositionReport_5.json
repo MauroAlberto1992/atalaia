@@ -1,0 +1,32 @@
+{
+ "MetaData": {
+  "MMSI": 204670570,
+  "MMSI_String": 204670570,
+  "ShipName": "PORTAS DO MAR",
+  "latitude": 37.73534,
+  "longitude": -25.6691,
+  "time_utc": "2026-11-26 23:39:09.799911979 +0000 UTC"
+ },
+ "MessageType": "PositionReport",
+ "Message": {
+  "PositionReport": {
+   "MessageID": 1,
+   "RepeatIndicator": 0,
+   "UserID": 204670570,
+   "Valid": true,
+   "NavigationalStatus": 15,
+   "RateOfTurn": -128,
+   "Sog": 0.1,
+   "PositionAccuracy": true,
+   "Longitude": -25.66909666666667,
+   "Latitude": 37.735339999999994,
+   "Cog": 360,
+   "TrueHeading": 511,
+   "Timestamp": 9,
+   "SpecialManoeuvreIndicator": 0,
+   "Spare": 0,
+   "Raim": true,
+   "CommunicationState": 33129
+  }
+ }
+}

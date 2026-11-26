@@ -1,0 +1,32 @@
+{
+ "MetaData": {
+  "MMSI": 204809000,
+  "MMSI_String": 204809000,
+  "ShipName": "ARQUIPELAGO         ",
+  "latitude": 38.53248,
+  "longitude": -28.62484,
+  "time_utc": "2026-11-26 23:38:59.717769554 +0000 UTC"
+ },
+ "MessageType": "PositionReport",
+ "Message": {
+  "PositionReport": {
+   "MessageID": 3,
+   "RepeatIndicator": 0,
+   "UserID": 204809000,
+   "Valid": true,
+   "NavigationalStatus": 5,
+   "RateOfTurn": 0,
+   "Sog": 0.1,
+   "PositionAccuracy": false,
+   "Longitude": -28.624843333333335,
+   "Latitude": 38.53248333333333,
+   "Cog": 202,
+   "TrueHeading": 359,
+   "Timestamp": 56,
+   "SpecialManoeuvreIndicator": 0,
+   "Spare": 0,
+   "Raim": false,
+   "CommunicationState": 49834
+  }
+ }
+}

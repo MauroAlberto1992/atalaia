@@ -1,0 +1,32 @@
+{
+ "MetaData": {
+  "MMSI": 311000317,
+  "MMSI_String": 311000317,
+  "ShipName": "AFRICAN ROOK        ",
+  "latitude": 41.19174,
+  "longitude": -8.69012,
+  "time_utc": "2026-11-26 23:39:01.365687441 +0000 UTC"
+ },
+ "MessageType": "PositionReport",
+ "Message": {
+  "PositionReport": {
+   "MessageID": 3,
+   "RepeatIndicator": 0,
+   "UserID": 311000317,
+   "Valid": true,
+   "NavigationalStatus": 5,
+   "RateOfTurn": 0,
+   "Sog": 0.1,
+   "PositionAccuracy": true,
+   "Longitude": -8.690123333333334,
+   "Latitude": 41.191739999999996,
+   "Cog": 241.2,
+   "TrueHeading": 233,
+   "Timestamp": 25,
+   "SpecialManoeuvreIndicator": 0,
+   "Spare": 0,
+   "Raim": false,
+   "CommunicationState": 84938
+  }
+ }
+}
