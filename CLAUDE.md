@@ -105,6 +105,8 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
 - SPA fallbacks (`try_files ... /index.html`) can hide missing files behind a 200; assets must 404.
 - Logs for dropped data say where and include a truncated sample.
 - Geographic or domain data needs a source, or is labelled as demo in the UI itself.
+  Memory is not a reference, not even for test coordinates (they were 66-560 m off).
+- Inspect real exported data before trusting a parser written from docs (Overpass relations had no centre).
 - Claims in docs (e.g. "precomputed") are checked against the code in review.
 - Declare every package the code imports; no reliance on transitive dependencies.
 - Kill old dev servers before testing; use strict ports.

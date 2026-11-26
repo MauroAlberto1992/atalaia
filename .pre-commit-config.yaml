@@ -15,7 +15,9 @@ repos:
         args: ["--maxkb=1000"]
       - id: detect-private-key
       - id: end-of-file-fixer
+        exclude: ^backend/data/  # raw exports (e.g. overpass-turbo) are kept byte-for-byte
       - id: trailing-whitespace
+        exclude: ^backend/data/
 
   # Secrets: blocks commits containing API keys, tokens, etc.
   - repo: https://github.com/gitleaks/gitleaks
