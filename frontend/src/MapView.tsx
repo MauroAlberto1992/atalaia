@@ -19,9 +19,49 @@ import { chevronIcon, darkIcon, droneIcon, ICON_PIXEL_RATIO, movingIcon, stopped
 import { type DarkInfo, sensorToGeo } from "./sensorGeo";
 import { zoneLabelPoints } from "./zoneLabels";
 import { useTrackStore } from "./store";
-import type { LngLat, Track, Zone } from "./types";
+import type { Corner, LngLat, Track, Zone } from "./types";
 
 setWorkerUrl(workerUrl);
+
+// The area being drawn: its points, and a line through them (closed once done).
+function draftGeoJSON(points: Corner[], closed: boolean): FeatureCollection {
+  const coords: [number, number][] = points.map(([lat, lon]) => [lon, lat]);
+  const first = coords[0];
+  const ring = closed && first && coords.length >= 3 ? [...coords, first] : coords;
+  return {
+    type: "FeatureCollection",
+    features: [
+      ...(ring.length >= 2 ? [{ type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates: ring } }] : []),
+      ...coords.map((c) => ({ type: "Feature" as const, properties: {}, geometry: { type: "Point" as const, coordinates: c } })),
+    ],
+  };
+}
+
+// Popup for a drawn area: its name, kind and a Delete button.
+function zonePopupContent(name: string, kind: string, popup: Popup): HTMLElement {
+  const box = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = "contact-title possible";
+  title.textContent = name;
+  const info = document.createElement("div");
+  info.textContent = `Drawn area (${kind}): alerts when a ship or a dark contact enters.`;
+  const btn = document.createElement("button");
+  btn.textContent = "Delete area";
+  btn.onclick = () => {
+    btn.disabled = true;
+    fetch(`/api/zones/${encodeURIComponent(name)}`, { method: "DELETE" })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        popup.remove(); // the map redraws when /live says the areas changed
+      })
+      .catch((e: unknown) => {
+        info.textContent = `Could not delete: ${String(e)}`;
+        btn.disabled = false;
+      });
+  };
+  box.append(title, info, btn);
+  return box;
+}
 
 // Popup for a sensor contact, built with textContent (no HTML from data).
 function contactPopup(info: DarkInfo, popup: Popup): HTMLElement {
@@ -84,7 +124,7 @@ function toGeoJSON(tracks: Record<number, Track>): FeatureCollection {
 }
 
 // Zone colours by kind; unknown kinds fall back to grey.
-const ZONE_COLOR: ExpressionSpecification = ["match", ["get", "kind"], "restricted", "#ef4444", "protected", "#22c55e", "speed", "#f59e0b", "port", "#64748b", "#94a3b8"];
+const ZONE_COLOR: ExpressionSpecification = ["match", ["get", "kind"], "restricted", "#ef4444", "watch", "#a78bfa", "protected", "#22c55e", "speed", "#f59e0b", "port", "#64748b", "#94a3b8"];
 // Ports are context (where stopping is normal), not alert areas: draw them faintly.
 const IS_PORT: ExpressionSpecification = ["==", ["get", "kind"], "port"];
 
@@ -100,7 +140,7 @@ function zonesGeoJSON(zones: Zone[]): FeatureCollection {
         // at least 3 vertices.
         coordinates: [[...z.polygon, ...z.polygon.slice(0, 1)].map(([lat, lon]) => [lon, lat])],
       },
-      properties: { name: z.name, kind: z.kind },
+      properties: { name: z.name, kind: z.kind, source: z.source },
     })),
   };
 }
@@ -173,13 +213,51 @@ export function MapView() {
         layout: { "text-field": ["get", "name"], "text-size": 10 },
         paint: { "text-color": ZONE_COLOR, "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
       });
-      fetch("/api/zones")
-        .then((r) => r.json())
-        .then((zones: Zone[]) => {
-          void (map.getSource("zones") as GeoJSONSource).setData(zonesGeoJSON(zones));
-          void (map.getSource("zone-labels") as GeoJSONSource).setData(zoneLabelPoints(zones));
-        })
-        .catch(() => {});
+      const loadZones = () =>
+        fetch("/api/zones")
+          .then((r) => r.json())
+          .then((zones: Zone[]) => {
+            void (map.getSource("zones") as GeoJSONSource).setData(zonesGeoJSON(zones));
+            void (map.getSource("zone-labels") as GeoJSONSource).setData(zoneLabelPoints(zones));
+          })
+          .catch(() => {});
+      void loadZones();
+
+      // Area being drawn (phase 16): its outline and points.
+      map.addSource("draft", { type: "geojson", data: draftGeoJSON([], false) });
+      map.addLayer({ id: "draft-line", type: "line", source: "draft", paint: { "line-color": "#fbbf24", "line-width": 2, "line-dasharray": [2, 1] } });
+      map.addLayer({ id: "draft-points", type: "circle", source: "draft", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 4, "circle-color": "#fbbf24", "circle-stroke-color": "#0c1220", "circle-stroke-width": 1.5 } });
+
+      // While drawing, a click adds a point instead of selecting things;
+      // a double click (or a click on the first point) closes the area.
+      map.on("click", (e) => {
+        const st = useTrackStore.getState();
+        if (!st.drawing || st.draftClosed) return;
+        const first = st.draft[0];
+        if (first && st.draft.length >= 3) {
+          const p = map.project([first[1], first[0]]);
+          if (Math.hypot(p.x - e.point.x, p.y - e.point.y) < 10) {
+            st.closeDraft();
+            return;
+          }
+        }
+        st.addDraftPoint([e.lngLat.lat, e.lngLat.lng]);
+      });
+      map.on("dblclick", (e) => {
+        const st = useTrackStore.getState();
+        if (!st.drawing) return;
+        e.preventDefault(); // no zoom
+        st.closeDraft();
+      });
+
+      // Drawn areas: click for a popup with "Delete".
+      const zonePopup = new Popup({ closeButton: true, className: "contact-popup" });
+      map.on("click", "zones-fill", (e: MapLayerMouseEvent) => {
+        if (useTrackStore.getState().drawing) return;
+        const p = e.features?.[0]?.properties as { name: string; kind: string; source: string } | undefined;
+        if (!p || p.source !== "user") return;
+        zonePopup.setLngLat(e.lngLat).setDOMContent(zonePopupContent(p.name, p.kind, zonePopup)).addTo(map);
+      });
 
       // Route of the selected ship, drawn under the ship icons.
       map.addSource("route", { type: "geojson", data: routeGeoJSON([]) });
@@ -254,6 +332,7 @@ export function MapView() {
       });
       const darkPopup = new Popup({ closeButton: true, className: "contact-popup" });
       map.on("click", "dark-tracks", (e: MapLayerMouseEvent) => {
+        if (useTrackStore.getState().drawing) return;
         const p = e.features?.[0]?.properties as { info: string } | undefined;
         if (!p) return;
         // GeoJSON properties are flattened to strings, hence JSON.
@@ -291,6 +370,7 @@ export function MapView() {
         paint: { "icon-opacity": ["case", ["get", "stale"], 0.6, 1] },
       });
       map.on("click", "ships", (e: MapLayerMouseEvent) => {
+        if (useTrackStore.getState().drawing) return; // clicks add points while drawing
         const mmsi = e.features?.[0]?.properties.mmsi as number | undefined;
         if (mmsi !== undefined) useTrackStore.getState().select(mmsi);
       });
@@ -301,12 +381,31 @@ export function MapView() {
       // render cycle: the map is updated directly, nothing re-renders.
       let lastFocus: LngLat | null = null;
       let lastHome = useTrackStore.getState().homeRequests;
+      let lastZonesVersion = useTrackStore.getState().zonesVersion;
+      let lastDraft: unknown = null;
+      let lastDraftClosed = false;
+      let lastDrawingNow = false;
       let lastDbRoute: unknown = null;
       let lastSensor: unknown = null;
       let lastDark: unknown = null;
       const sync = () => {
         const { tracks, selected, route, focus, window, dbRoute, sensor, dark, showDetections, homeRequests } =
           useTrackStore.getState();
+        const st = useTrackStore.getState();
+        if (st.zonesVersion !== lastZonesVersion) {
+          lastZonesVersion = st.zonesVersion;
+          void loadZones();
+        }
+        if (st.draft !== lastDraft || st.draftClosed !== lastDraftClosed) {
+          lastDraft = st.draft;
+          lastDraftClosed = st.draftClosed;
+          void (map.getSource("draft") as GeoJSONSource).setData(draftGeoJSON(st.draft, st.draftClosed));
+        }
+        const drawingNow = st.drawing && !st.draftClosed;
+        if (drawingNow !== lastDrawingNow) {
+          lastDrawingNow = drawingNow;
+          map.getCanvas().style.cursor = drawingNow ? "crosshair" : "";
+        }
         if (homeRequests !== lastHome) {
           lastHome = homeRequests;
           if (home) map.fitBounds(home, { padding: 20 });

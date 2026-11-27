@@ -35,6 +35,8 @@ class AlertKind(StrEnum):
     COVERAGE_RESTORED = "coverage_restored"
     # Sensor fusion (fusion.py): a sensor contact no AIS track explains.
     DARK_VESSEL = "dark_vessel"
+    # A confirmed dark contact inside an area that alerts on entry (phase 16).
+    DARK_IN_ZONE = "dark_in_zone"
 
 
 class Alert(BaseModel):
@@ -53,7 +55,9 @@ class Alert(BaseModel):
 
 class AlertEngine:
     def __init__(self, zones: list[Zone], max_alerts: int = MAX_ALERTS) -> None:
-        self._zones = zones
+        # Own copy: user areas are added and removed here (phase 16), and the
+        # caller's list is shared with other components.
+        self._zones = list(zones)
         self._inside: dict[int, set[str]] = {}  # mmsi -> names of zones it is in
         self._speeding: set[tuple[int, str]] = set()  # already alerted this visit
         self._alerts: deque[Alert] = deque(maxlen=max_alerts)  # oldest drop off
@@ -87,6 +91,32 @@ class AlertEngine:
         self._next_id += 1
         self._alerts.append(alert)
         return alert
+
+    @property
+    def zones(self) -> list[Zone]:
+        return list(self._zones)
+
+    def add_zone(self, zone: Zone, tracks: list[Track]) -> None:
+        """Add an area while running. Ships already inside are recorded as
+        inside without an alert: only a real entry after creation alerts.
+        (At startup, by contrast, a ship first seen inside counts as entering.)"""
+        self._zones.append(zone)
+        for t in tracks:
+            if not t.stale and zone.contains(t.latitude, t.longitude):
+                self._inside.setdefault(t.mmsi, set()).add(zone.name)
+
+    def remove_zone(self, name: str) -> None:
+        """Remove an area without exit alerts: the area went, not the ships."""
+        self._zones = [z for z in self._zones if z.name != name]
+        for inside in self._inside.values():
+            inside.discard(name)
+        self._speeding = {k for k in self._speeding if k[1] != name}
+
+    def zones_containing(self, lat: float, lon: float) -> list[Zone]:
+        """Areas that alert on entry and contain this point (ports excluded)."""
+        return [
+            z for z in self._zones if z.alert_on_entry and z.kind != "port" and z.contains(lat, lon)
+        ]
 
     def _raise(self, kind: AlertKind, track: Track, zone: str, at: datetime, message: str) -> Alert:
         return self.record(kind, track, at, message, zone=zone)

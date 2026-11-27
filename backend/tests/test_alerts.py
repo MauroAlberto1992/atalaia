@@ -87,12 +87,8 @@ def test_recent_is_newest_first_and_bounded():
 
 
 def test_config_zones_load():
-    # Phase 13: only the offshore demo area remains (coastal demo zones removed).
-    zones = load_zones()
-    assert [z.name for z in zones] == ["Algarve exercise area (demo)"]
-    area = zones[0]
-    assert area.contains(36.85, -8.40)  # where the fishing fleet works offshore
-    assert not area.contains(37.10, -8.53)  # Portimão harbour: outside it
+    # Phase 16: the last demo zone was removed; operators draw their own areas.
+    assert load_zones() == []
 
 
 def test_no_dark_alert_in_a_port_even_inside_another_zone():

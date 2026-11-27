@@ -25,7 +25,8 @@ export type Corner = [number, number]; // [lat, lon], backend/config order
 // Mirrors backend/src/minicop/zones.py::Zone.
 export interface Zone {
   name: string;
-  kind: string; // "restricted" | "protected" | "speed" | "port"; others get a default colour
+  kind: string; // "restricted" | "watch" | "protected" | "speed" | "port"; others get a default colour
+  source: "config" | "port" | "user"; // "user" = drawn on the map (phase 16), can be deleted
   alert_on_entry: boolean;
   max_speed_kn: number | null;
   polygon: Corner[];
@@ -36,7 +37,7 @@ export interface Zone {
 export interface Alert {
   id: number;
   kind: "enter" | "exit" | "speeding" | "dark" | "loitering" | "rendezvous" | "reappeared" | "spoofing"
-    | "coverage_lost" | "coverage_restored" | "dark_vessel";
+    | "coverage_lost" | "coverage_restored" | "dark_vessel" | "dark_in_zone";
   mmsi: number;
   ship_name: string;
   zone: string | null; // null for behavioural anomalies
@@ -51,6 +52,7 @@ export type LiveMessage =
   | { type: "snapshot"; tracks: Track[]; alerts: Alert[]; sensor?: SensorSweep | null; dark?: DarkTrack[] }
   | { type: "sensor"; sweep: SensorSweep }
   | { type: "dark"; tracks: DarkTrack[] }
+  | { type: "zones" } // drawn areas changed: refetch GET /zones
   | { type: "alert"; alert: Alert }
   | { type: "track"; track: Track }
   | { type: "stale"; mmsi: number }

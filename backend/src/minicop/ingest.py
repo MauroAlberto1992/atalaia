@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from websockets.asyncio.client import connect
 
 from minicop.config import Settings
-from minicop.events import PositionEvent, SensorTick, Tick
+from minicop.events import PositionEvent, SensorTick, Tick, ZoneAdded, ZoneRemoved
 from minicop.parsing import POSITION_TYPES, parse_event
 
 log = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class IngestStatus:
 
 async def run_ingestion(
     settings: Settings,
-    events: "asyncio.Queue[PositionEvent | Tick | SensorTick]",
+    events: "asyncio.Queue[PositionEvent | Tick | SensorTick | ZoneAdded | ZoneRemoved]",
     status: IngestStatus,
 ) -> None:
     subscription = json.dumps(

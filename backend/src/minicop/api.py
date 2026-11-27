@@ -20,7 +20,7 @@ from minicop.alerts import Alert, AlertEngine, AlertKind
 from minicop.anomalies import AnomalyConfig, AnomalyDetector, load_anomaly_config
 from minicop.config import Area, load_settings
 from minicop.coverage import CoverageConfig, CoverageMonitor, load_coverage_config
-from minicop.events import PositionEvent, SensorTick, Tick, Track
+from minicop.events import PositionEvent, SensorTick, Tick, Track, ZoneAdded, ZoneRemoved
 from minicop.fusion import DarkTrack, FusionEngine
 from minicop.history import HistoryPoint, HistoryStats
 from minicop.history_db import HistoryDB, ShipSeen, window_start
@@ -31,6 +31,13 @@ from minicop.recorder import Recorder
 from minicop.routes import MAX_POINTS, RoutePoint, RouteStats, route_stats, split_segments, thin
 from minicop.sensors import DroneSimulator, SensorsConfig, load_sensors_config
 from minicop.state import TrackStore
+from minicop.user_zones import (
+    UserZoneIn,
+    delete_user_zone,
+    load_user_zones,
+    polygon_problem,
+    save_user_zone,
+)
 from minicop.zones import Zone, load_zones
 
 log = logging.getLogger(__name__)
@@ -39,7 +46,7 @@ EVENT_QUEUE_SIZE = 10_000
 SWEEP_INTERVAL_S = 30
 
 # Positions from ingestion and clock ticks share one queue (single writer).
-EventQueue = asyncio.Queue[PositionEvent | Tick | SensorTick]
+EventQueue = asyncio.Queue[PositionEvent | Tick | SensorTick | ZoneAdded | ZoneRemoved]
 
 
 class RouteResponse(BaseModel):
@@ -76,7 +83,13 @@ async def run_state(
     while True:
         event = await events.get()
         try:
-            if isinstance(event, SensorTick):
+            if isinstance(event, ZoneAdded):
+                engine.add_zone(event.zone, store.snapshot())
+                hub.publish({"type": "zones"})  # clients refetch GET /zones
+            elif isinstance(event, ZoneRemoved):
+                engine.remove_zone(event.name)
+                hub.publish({"type": "zones"})
+            elif isinstance(event, SensorTick):
                 if sensor is not None:
                     for message in sensor.step(event.now, store, engine):
                         hub.publish(message)
@@ -135,6 +148,8 @@ class SimulatedSensor:
     sweep_s: float
     last_sweep: dict[str, object] | None = None  # public sweep, for /live snapshots
     dark: list[DarkTrack] = field(default_factory=list)
+    # (contact id, area name) already alerted as dark_in_zone: once per visit.
+    in_zone: set[tuple[str, str]] = field(default_factory=set)
 
     def step(
         self, now: datetime, store: TrackStore, engine: AlertEngine
@@ -156,17 +171,7 @@ class SimulatedSensor:
         messages.append({"type": "sensor", "sweep": self.last_sweep})
         messages.append({"type": "dark", "tracks": [d.model_dump(mode="json") for d in self.dark]})
         for d in outcome.newly_confirmed:
-            stand_in = Track(  # alerts are keyed by ship; a dark contact has no MMSI
-                mmsi=0,
-                ship_name=d.id,
-                latitude=d.lat,
-                longitude=d.lon,
-                sog=d.sog or 0.0,
-                cog=d.cog if d.cog is not None else 360.0,  # 360 = "not available"
-                true_heading=511,
-                navigational_status=15,
-                last_seen=d.last_seen,
-            )
+            stand_in = _stand_in(d)
             motion = (
                 f"~{d.sog:.0f} kn heading {d.cog:.0f}°"
                 if d.sog is not None and d.cog is not None
@@ -182,7 +187,49 @@ class SimulatedSensor:
                 lon=d.lon,
             )
             messages.append({"type": "alert", "alert": alert.model_dump(mode="json")})
+        messages.extend(self._dark_in_zones(engine))
         return messages
+
+    def _dark_in_zones(self, engine: AlertEngine) -> list[dict[str, object]]:
+        """Phase 16: one alert per dark contact and area it is in (not for
+        contacts an AIS ship could explain). Leaving the area re-arms it."""
+        messages: list[dict[str, object]] = []
+        now_in: set[tuple[str, str]] = set()
+        for d in self.dark:
+            if not d.confirmed or d.possible_mmsi is not None:
+                continue
+            for zone in engine.zones_containing(d.lat, d.lon):
+                key = (d.id, zone.name)
+                now_in.add(key)
+                if key in self.in_zone:
+                    continue
+                alert = engine.record(
+                    AlertKind.DARK_IN_ZONE,
+                    _stand_in(d),
+                    d.last_seen,
+                    f"Non-cooperative contact {d.id} inside {zone.name} (SIMULATED sensor)",
+                    zone=zone.name,
+                    lat=d.lat,
+                    lon=d.lon,
+                )
+                messages.append({"type": "alert", "alert": alert.model_dump(mode="json")})
+        self.in_zone = now_in
+        return messages
+
+
+def _stand_in(d: DarkTrack) -> Track:
+    """Alerts are keyed by ship; a dark contact has no MMSI (0) and its id as name."""
+    return Track(
+        mmsi=0,
+        ship_name=d.id,
+        latitude=d.lat,
+        longitude=d.lon,
+        sog=d.sog or 0.0,
+        cog=d.cog if d.cog is not None else 360.0,  # 360 = "not available"
+        true_heading=511,
+        navigational_status=15,
+        last_seen=d.last_seen,
+    )
 
 
 async def run_sensor_clock(events: EventQueue, sweep_s: float) -> None:
@@ -218,6 +265,38 @@ class Runtime:
     sensor: SimulatedSensor | None  # SIMULATED drone + fusion (phase 15), off by default
     status: IngestStatus
     area: Area | None
+    # Names of the areas drawn by operators (phase 16). Kept here, under
+    # zone_lock, so the API can check names without waiting for the state task.
+    user_zone_names: set[str] = field(default_factory=set)
+    zone_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+
+class ZoneCreated(BaseModel):
+    zone: Zone
+    saved: bool  # False without a database: the area is lost on restart
+
+
+async def load_saved_zones(rt: Runtime) -> None:
+    """Put the areas saved in the database on the queue, once the recorder has
+    connected (it runs the migrations, including 003_user_zones). Retries
+    quietly while the database is down."""
+    if rt.recorder is None or rt.history_db is None:
+        return
+    while True:
+        if rt.recorder.connected:
+            try:
+                zones = await load_user_zones(await rt.history_db.pool())
+            except (OSError, asyncpg.PostgresError) as exc:
+                log.warning("Could not load drawn areas yet: %s", exc)
+            else:
+                async with rt.zone_lock:
+                    for zone in zones:
+                        if zone.name not in rt.user_zone_names:
+                            rt.user_zone_names.add(zone.name)
+                            await rt.events.put(ZoneAdded(zone=zone))
+                log.info("Loaded %d drawn areas", len(zones))
+                return
+        await asyncio.sleep(2)
 
 
 def apply_demo_overrides(cfg: SensorsConfig, env: Mapping[str, str]) -> SensorsConfig:
@@ -332,6 +411,7 @@ def create_app(
         ]
         if rt.recorder is not None:
             tasks.append(asyncio.create_task(rt.recorder.run()))
+            tasks.append(asyncio.create_task(load_saved_zones(rt)))
         if settings:
             tasks.append(asyncio.create_task(run_ingestion(settings, rt.events, rt.status)))
         yield
@@ -374,7 +454,51 @@ def create_app(
 
     @app.get("/zones")
     async def zones_() -> list[Zone]:
-        return zone_list
+        """Config zones, ports and the areas drawn by operators (`source`)."""
+        return runtime().alerts.zones
+
+    fixed_names = {z.name for z in zone_list}
+
+    @app.post("/zones", status_code=201)
+    async def create_zone(body: UserZoneIn) -> ZoneCreated:
+        """An operator drew an area (phase 16). Stored when there is a database."""
+        rt = runtime()
+        zone = body.to_zone()
+        problem = polygon_problem(zone.polygon, rt.area)
+        if problem:
+            raise HTTPException(422, problem)
+        async with rt.zone_lock:
+            if zone.name in fixed_names or zone.name in rt.user_zone_names:
+                raise HTTPException(409, f'An area called "{zone.name}" already exists')
+            saved = False
+            if rt.history_db is not None:
+                try:
+                    await save_user_zone(await rt.history_db.pool(), zone)
+                except (OSError, asyncpg.PostgresError) as exc:
+                    raise HTTPException(
+                        503, f"Area not saved, database unavailable: {exc}"
+                    ) from exc
+                saved = True
+            rt.user_zone_names.add(zone.name)
+            await rt.events.put(ZoneAdded(zone=zone))
+        return ZoneCreated(zone=zone, saved=saved)
+
+    @app.delete("/zones/{name}", status_code=204)
+    async def delete_zone(name: str) -> None:
+        """Delete a drawn area. Config zones and ports can't be deleted."""
+        rt = runtime()
+        async with rt.zone_lock:
+            if name in fixed_names:
+                raise HTTPException(409, "Only areas drawn on the map can be deleted")
+            if name not in rt.user_zone_names:
+                raise HTTPException(404, f'No drawn area called "{name}"')
+            if rt.history_db is not None:
+                try:
+                    await delete_user_zone(await rt.history_db.pool(), name)
+                except (OSError, asyncpg.PostgresError) as exc:
+                    raise HTTPException(503, f"Database unavailable: {exc}") from exc
+            rt.user_zone_names.discard(name)
+            await rt.events.put(ZoneRemoved(name=name))
 
     @app.get("/alerts")
     async def alerts() -> list[Alert]:
