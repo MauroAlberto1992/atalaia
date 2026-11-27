@@ -31,6 +31,12 @@ On the developer's data, a Barreiro–Terreiro do Paço ferry went back and fort
 - **Tests:** compass bearings, the "points to the next one" rule, a ferry going and coming back (0°, 180°, 180°), and lone points.
 - **Verified in the browser** against the real backend and database, with an out-and-back route: the chevrons point north on the way out and south on the way back.
 
+## Addendum: sorting the recent ships list (requested)
+- **Three sort options** in "Recent ships": **Recent** (last seen first, the default), **Live first** (ships on the live map first, then by recency) and **Points** (most recorded points first, ties by recency).
+- The choice is remembered in `localStorage`, guarded so it falls back to "Recent".
+- `shipSort.ts` is pure: it never mutates its input, and it has 4 tests.
+- **Verified in the browser** against the real backend and database: every order is correct, and the choice survives a reload.
+
 ## Decisions
 - **Gaps are shown, not hidden.** The overnight data showed about 30 reports per ship per hour, unevenly spread. A plain line through the points would claim knowledge we don't have.
 - **Statistics exclude gaps.** Distance and average speed over a 45-minute silence are unknown, so they are not counted.
