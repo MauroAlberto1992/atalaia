@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   Alert,
   ConnectionState,
+  Corner,
   DarkTrack,
   HistoryWindow,
   SensorSweep,
@@ -21,7 +22,11 @@ export interface TrackState {
   route: LngLat[]; // route of the selected ship only
   alerts: Alert[]; // newest first
   unseen: number; // alerts received live since the user last looked
-  homeRequests: number; // incremented by the "whole area" button; the map frames the area
+  homeRequests: number;
+  zonesVersion: number; // bumped when /live says the drawn areas changed: refetch
+  drawing: boolean; // the operator is drawing an area (phase 16)
+  draft: Corner[]; // its points so far, [lat, lon]
+  draftClosed: boolean; // closed: waiting for a name and a kind // incremented by the "whole area" button; the map frames the area
   focus: LngLat | null; // map flies here when this changes (new array = new request)
   // Phase 14: recorded history for the selected ship.
   window: HistoryWindow; // "live" = in-memory route (as before), else hours from the DB
@@ -41,7 +46,7 @@ export function reduceLive(tracks: Record<number, Track>, msg: LiveMessage): Rec
     // A snapshot replaces everything (also after a reconnect).
     return Object.fromEntries(msg.tracks.map((t) => [t.mmsi, t]));
   }
-  if (msg.type === "alert" || msg.type === "sensor" || msg.type === "dark") return tracks;
+  if (msg.type === "alert" || msg.type === "sensor" || msg.type === "dark" || msg.type === "zones") return tracks;
   if (msg.type === "stale") {
     const t = tracks[msg.mmsi];
     return t ? { ...tracks, [msg.mmsi]: { ...t, stale: true } } : tracks;
@@ -80,6 +85,11 @@ interface TrackActions {
   selectHistoric: (ship: ShipSeen) => void;
   markSeen: () => void;
   goHome: () => void;
+  startDraw: () => void;
+  addDraftPoint: (p: Corner) => void;
+  closeDraft: () => void;
+  cancelDraw: () => void;
+  zonesChanged: () => void;
 }
 
 export const useTrackStore = create<TrackState & TrackActions>()((set, get) => ({
@@ -91,6 +101,10 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
   unseen: 0,
   focus: null,
   homeRequests: 0,
+  zonesVersion: 0,
+  drawing: false,
+  draft: [],
+  draftClosed: false,
   window: "live",
   dbRoute: null,
   dbError: null,
@@ -112,15 +126,19 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
               : {};
       const alerts = reduceAlerts(s.alerts, msg);
       const unseen = msg.type === "alert" ? s.unseen + 1 : s.unseen;
+      // Drawn areas changed, or (re)connected and possibly missed a change.
+      const zonesPart =
+        msg.type === "zones" || msg.type === "snapshot" ? { zonesVersion: s.zonesVersion + 1 } : {};
       // The selected ship may be gone (removed, or missing from a new snapshot).
       // A ship picked from the recorded history is meant to be off the live map.
       if (s.selected !== null && !(s.selected in tracks) && s.historyShip === null)
-        return { tracks, alerts, unseen, ...sensorPart, selected: null, route: [] };
+        return { tracks, alerts, unseen, ...sensorPart, ...zonesPart, selected: null, route: [] };
       return {
         tracks,
         alerts,
         unseen,
         ...sensorPart,
+        ...zonesPart,
         route:
           msg.type === "track" && msg.track.mmsi === s.selected ? appendRoute(s.route, msg.track) : s.route,
       };
@@ -189,4 +207,10 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
       .catch(() => {}); // no history: the route just starts from live updates
   },
   goHome: () => set((s) => ({ homeRequests: s.homeRequests + 1 })),
+  startDraw: () => set({ drawing: true, draft: [], draftClosed: false }),
+  addDraftPoint: (p) => set((s) => (s.drawing && !s.draftClosed ? { draft: [...s.draft, p] } : {})),
+  // Closing needs 3 points; the backend checks the rest (crossings, area).
+  closeDraft: () => set((s) => (s.draft.length >= 3 ? { draftClosed: true } : {})),
+  cancelDraw: () => set({ drawing: false, draft: [], draftClosed: false }),
+  zonesChanged: () => set((s) => ({ zonesVersion: s.zonesVersion + 1 })),
 }));

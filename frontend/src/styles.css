@@ -140,3 +140,17 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
   color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
 }
 .home-button:hover { background: #1e293b; }
+
+/* Drawing an area (phase 16). */
+.draw-area { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 100%; }
+.draw-area.panel-box {
+  width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+}
+.draw-area .note { margin: 0; font-size: 12px; }
+.draw-area form { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.draw-area input {
+  width: 100%; box-sizing: border-box; margin-top: 2px; padding: 3px 6px; font: inherit;
+  background: #0b1220; color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+}
+.draw-area .sorts { display: flex; gap: 4px; }

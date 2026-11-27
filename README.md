@@ -75,8 +75,8 @@ npm run dev                 # http://localhost:5173
 npm test
 ```
 
-Areas are configured in `backend/config/areas.toml`, zones in
-`backend/config/zones.toml`, and port areas come from OpenStreetMap in
+Areas are configured in `backend/config/areas.toml`, optional fixed zones in
+`backend/config/zones.toml` (operators can also draw their own areas on the map), and port areas come from OpenStreetMap in
 `backend/config/ports.json` (© OpenStreetMap contributors, ODbL). Coordinates there are `[lat, lon]`, latitude first.
 
 ## Ideas for next steps

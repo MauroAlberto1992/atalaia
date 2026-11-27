@@ -3,7 +3,7 @@ import { zoneLabelPoints } from "./zoneLabels";
 import type { Zone } from "./types";
 
 const box: Zone = {
-  name: "Box", kind: "restricted", alert_on_entry: true, max_speed_kn: null,
+  name: "Box", kind: "restricted", source: "config", alert_on_entry: true, max_speed_kn: null,
   polygon: [[36.7, -8.4], [36.7, -8.2], [36.8, -8.2], [36.8, -8.4]],
   bbox: [[36.7, -8.4], [36.8, -8.2]],
 };

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AlertPanel } from "./AlertPanel";
+import { DrawArea } from "./DrawArea";
 import { connectLive } from "./live";
 import { MapView } from "./MapView";
 import { RecentShips } from "./RecentShips";
@@ -20,6 +21,7 @@ export function App() {
         <button className="home-button" onClick={() => useTrackStore.getState().goHome()}>
           ⌂ Whole area
         </button>
+        <DrawArea />
       </div>
     </>
   );

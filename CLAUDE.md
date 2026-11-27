@@ -30,7 +30,7 @@ One always-on process, event-driven internally (asyncio queues, no broker):
    PostgreSQL + TimescaleDB + PostGIS (`db` service; migrations in `backend/migrations`).
    Never blocks the live path; optional (off without `DATABASE_URL`).
 3. API: `GET /tracks` (current snapshot) and `WS /live` (real-time changes),
-   plus `/tracks/{mmsi}/history`, `/tracks/{mmsi}/route`, `/ships`, `/zones`, `/alerts`,
+   plus `/tracks/{mmsi}/history`, `/tracks/{mmsi}/route`, `/ships`, `/zones` (GET/POST/DELETE), `/alerts`,
    `/area`, `/health`.
 The browser never connects to aisstream directly.
 
@@ -91,7 +91,8 @@ Keep company names out of user-facing text (README, UI); they live here only.
 13. Class B vessels (small craft): messages 18/19, ais_class everywhere, smaller icon.
 14. Routes from the database: window 1 h-7 d, segments split at gaps, honest drawing, recent ships.
 15. Sensor fusion (SIMULATED drone sensor): AIS association, dark-vessel tracks and alerts, evaluation.
-Next: 16 user-drawn areas. (Sparse-AIS false darks: mitigated, 38 -> 4; a dark vessel next to AIS ships can hide, see phase-15.md.)
+16. User-drawn areas: draw on the map, POST/DELETE /zones, stored in user_zones, dark_in_zone alerts.
+(Sparse-AIS false darks: mitigated; a dark vessel next to AIS ships can hide, see phase-15.md.)
 
 ## Layout
 ```
