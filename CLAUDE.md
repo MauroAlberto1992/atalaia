@@ -134,3 +134,4 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
 - Keep test data clearly on one side of a threshold (e.g. chord vs arc made 4 kn fall just under 2 nm).
 - A demo/speed option is verified by its end result (contacts confirmed), not only by its inputs (drone moving).
 - In a simulated scenario, measure that the sensor actually sees the targets before handing it over.
+- Editing a file back and forth within a second can leave a stale `__pycache__`: clear it, or mutate in memory.
