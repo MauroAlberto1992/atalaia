@@ -36,6 +36,8 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .panel dt { color: var(--muted); }
 .panel dd { margin: 0; }
 
+.status .sim { color: #fbbf24; font-size: 11px; letter-spacing: 0.05em; }
+.status .dark-count { color: #fca5a5; }
 .badge { background: #dc2626; color: white; border-radius: 10px; padding: 1px 8px; }
 
 .alerts {
@@ -75,6 +77,7 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .alert.spoofing .icon { color: #f43f5e; }
 .alert.coverage_lost .icon { color: #94a3b8; }
 .alert.coverage_restored .icon { color: #22c55e; }
+.alert.dark_vessel .icon { color: #ef4444; }
 
 .panel .windows { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
 .note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }

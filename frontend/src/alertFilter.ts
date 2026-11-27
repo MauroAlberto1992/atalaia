@@ -18,6 +18,7 @@ const GROUP_OF: Record<Alert["kind"], AlertGroup> = {
   spoofing: "behaviour",
   coverage_lost: "system",
   coverage_restored: "system",
+  dark_vessel: "system",
 };
 
 export function groupOf(alert: Alert): AlertGroup {

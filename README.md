@@ -23,6 +23,7 @@ history, zones and alerts.
   - two ships meeting at sea (possible transfer);
   - reappearance after an AIS gap, with the distance and implied speed;
   - possible spoofing (repeated impossible jumps).
+- **Sensor fusion (SIMULATED sensor):** a simulated patrol drone's detections are fused with AIS. Contacts no AIS track explains become **dark vessel** tracks and alerts, and the fusion is scored against ground truth (`backend/scripts/evaluate_fusion.py`).
 - **Zones and alerts.**
   - Entry and exit of restricted areas.
   - Speeding in speed-limited zones.
@@ -97,7 +98,7 @@ Full list of ideas:
 Start with explainable rules and scores. Each alert says *why*, which an operator can act on.
 Add learned models where rules fall short.
 
-### Priority 2: fusion with non-cooperative sensors
+### Priority 2: fusion with non-cooperative sensors (first version done in phase 15, simulated sensor)
 AIS only shows ships that *choose* to transmit.
 The real value is correlating it with detections that don't depend on the ship: radar, SAR satellite images, or EO/IR cameras on drones.
 - Add a second (initially simulated) source: e.g. "drone detections" with position, time and uncertainty.

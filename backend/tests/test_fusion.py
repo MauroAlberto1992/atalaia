@@ -118,7 +118,8 @@ def test_dark_target_confirmed_after_3_of_5_sweeps():
         out = eng.process(sweep(t, dets), tracks=[])
         if out.newly_confirmed:
             confirmed_at = k
-            assert out.newly_confirmed[0].sog == pytest.approx(6, rel=0.2)
+            # 1.5 min of detections: too short to report a speed honestly.
+            assert out.newly_confirmed[0].sog is None
     assert confirmed_at == 3  # hits on sweeps 0, 2, 3
 
 
@@ -186,3 +187,22 @@ def test_simulator_sees_ships_and_dark_targets_in_its_footprint_only():
         truths += [d.truth for d in s.detections]
     assert "ais:2" not in truths
     assert truths.count("ais:1") > 0  # Pd 0.9, but the drone moves away over 20 min
+
+
+def test_speed_is_reported_once_detections_span_3_minutes():
+    eng = FusionEngine(F)
+    out = None
+    for k in range(8):  # 6 kn east, every 30 s, for 3.5 min
+        t = T0 + timedelta(seconds=30 * k)
+        out = eng.process(sweep(t, [det(*east(*SEA, 6 * 30 * k / 3600), t)]), tracks=[])
+    assert out is not None and out.dark[0].sog == pytest.approx(6, rel=0.1)
+    assert out.dark[0].cog == pytest.approx(90, abs=5)
+
+
+def test_implausible_hop_blocks_confirmation():
+    eng = FusionEngine(F)
+    # Middle detection 0.34 nm away 30 s later (about 41 kn): not a ship.
+    for k, pos in enumerate([SEA, east(*SEA, 0.34), SEA]):
+        t = T0 + timedelta(seconds=30 * k)
+        out = eng.process(sweep(t, [det(*pos, t)]), tracks=[])
+        assert out.newly_confirmed == []

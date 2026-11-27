@@ -24,6 +24,9 @@ from minicop.events import Track
 from minicop.geo import haversine_nm
 from minicop.sensors import Detection, FusionConfig, Sweep
 
+# Speed and course are only reported once a contact's detections span this long.
+MIN_SPAN_FOR_SPEED = timedelta(minutes=3)
+
 
 def dead_reckon(track: Track, t: datetime) -> tuple[float, float]:
     """Where the ship would be at `t`, keeping its last speed and course.
@@ -76,8 +79,11 @@ class DarkTrack(BaseModel):
     id: str
     lat: float
     lon: float
-    sog: float  # estimated from its detections, knots
-    cog: float  # estimated, degrees
+    # Estimated from its detections; None until they span MIN_SPAN_FOR_SPEED,
+    # because with ~150 m position error, 3 detections in 1 minute gave 16 kn
+    # for a 6 kn target (seen in the browser test).
+    sog: float | None
+    cog: float | None
     detections: int
     first_seen: datetime
     last_seen: datetime
@@ -96,12 +102,13 @@ class _Candidate:
     def last(self) -> Detection:
         return self.points[-1]
 
-    def velocity(self) -> tuple[float, float]:
-        """(sog kn, cog deg) from first to last detection (noisy for short spans)."""
+    def velocity(self) -> tuple[float, float] | None:
+        """(sog kn, cog deg) from first to last detection, or None if they span
+        less than MIN_SPAN_FOR_SPEED (too noisy to be worth showing)."""
         a, b = self.points[0], self.points[-1]
+        if b.time - a.time < MIN_SPAN_FOR_SPEED:
+            return None
         hours = (b.time - a.time).total_seconds() / 3600
-        if hours <= 0:
-            return 0.0, 0.0
         dist = haversine_nm(a.lat, a.lon, b.lat, b.lon)
         north = (b.lat - a.lat) * 60
         east = (b.lon - a.lon) * 60 * math.cos(math.radians(a.lat))
@@ -180,11 +187,19 @@ class FusionEngine:
         hits = [s for s in c.hit_sweeps if s >= window_start]
         if len(hits) < self.cfg.confirm_hits:
             return False
-        sog, _ = c.velocity()
-        return sog <= self.cfg.max_speed_kn
+        # Plausibility: no hop between consecutive detections faster than a ship.
+        for p, q in zip(c.points, c.points[1:], strict=False):
+            hours = (q.time - p.time).total_seconds() / 3600
+            if (
+                hours > 0
+                and haversine_nm(p.lat, p.lon, q.lat, q.lon) / hours > self.cfg.max_speed_kn
+            ):
+                return False
+        return True
 
     def _as_dark(self, c: _Candidate) -> DarkTrack:
-        sog, cog = c.velocity()
+        v = c.velocity()
+        sog, cog = v if v else (None, None)
         return DarkTrack(
             id=c.id,
             lat=c.last.lat,

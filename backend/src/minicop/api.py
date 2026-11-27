@@ -161,18 +161,23 @@ class SimulatedSensor:
                 ship_name=d.id,
                 latitude=d.lat,
                 longitude=d.lon,
-                sog=d.sog,
-                cog=d.cog,
+                sog=d.sog or 0.0,
+                cog=d.cog if d.cog is not None else 360.0,  # 360 = "not available"
                 true_heading=511,
                 navigational_status=15,
                 last_seen=d.last_seen,
+            )
+            motion = (
+                f"~{d.sog:.0f} kn heading {d.cog:.0f}°"
+                if d.sog is not None and d.cog is not None
+                else "speed not yet known"
             )
             alert = engine.record(
                 AlertKind.DARK_VESSEL,
                 stand_in,
                 d.last_seen,
                 f"Non-cooperative contact {d.id}: {d.detections} sensor detections, no AIS, "
-                f"~{d.sog:.0f} kn heading {d.cog:.0f}° (SIMULATED sensor)",
+                f"{motion} (SIMULATED sensor)",
                 lat=d.lat,
                 lon=d.lon,
             )
