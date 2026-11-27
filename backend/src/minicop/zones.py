@@ -19,6 +19,7 @@ class Zone(BaseModel):
     alert_on_entry: bool = False
     max_speed_kn: float | None = None
     polygon: list[Corner] = Field(min_length=3)  # [lat, lon] vertices
+    source: str = "config"  # "config" (zones.toml), "port" (OpenStreetMap), "user" (drawn)
 
     _bbox: tuple[Corner, Corner] = PrivateAttr()
 

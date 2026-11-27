@@ -42,7 +42,7 @@ async def fresh_connection() -> asyncpg.Connection:
     conn = await connect_when_ready()
     await conn.execute(
         "DROP TABLE IF EXISTS positions CASCADE; DROP TABLE IF EXISTS ships CASCADE;"
-        "DROP TABLE IF EXISTS schema_migrations;"
+        "DROP TABLE IF EXISTS user_zones; DROP TABLE IF EXISTS schema_migrations;"
     )
     return conn
 
@@ -55,7 +55,11 @@ def test_migrations_apply_once():
     async def body():
         conn = await fresh_connection()
         try:
-            assert await migrate(conn) == ["001_positions.sql", "002_ais_class.sql"]
+            assert await migrate(conn) == [
+                "001_positions.sql",
+                "002_ais_class.sql",
+                "003_user_zones.sql",
+            ]
             assert await migrate(conn) == []  # idempotent
             hypertables = await conn.fetchval(
                 "SELECT count(*) FROM timescaledb_information.hypertables"
@@ -177,5 +181,39 @@ def test_route_and_ships_queries():
         finally:
             await db.close()
             await conn.close()
+
+    run(body())
+
+
+def test_drawn_areas_round_trip():
+    """Phase 16: an area drawn by an operator survives a restart."""
+    from minicop.user_zones import (
+        UserZoneIn,
+        delete_user_zone,
+        load_user_zones,
+        save_user_zone,
+    )
+
+    async def body():
+        conn = await fresh_connection()
+        await migrate(conn)
+        await conn.close()
+        pool = await asyncpg.create_pool(DSN, min_size=1, max_size=2)
+        try:
+            zone = UserZoneIn(
+                name="Night watch",
+                kind="watch",
+                polygon=[(36.9, -8.5), (36.9, -8.4), (36.8, -8.45)],
+            ).to_zone()
+            await save_user_zone(pool, zone)
+            loaded = await load_user_zones(pool)
+            assert loaded == [zone]
+            assert loaded[0].source == "user" and loaded[0].alert_on_entry
+            with pytest.raises(asyncpg.UniqueViolationError):
+                await save_user_zone(pool, zone)
+            await delete_user_zone(pool, "Night watch")
+            assert await load_user_zones(pool) == []
+        finally:
+            await pool.close()
 
     run(body())

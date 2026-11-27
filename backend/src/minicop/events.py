@@ -5,6 +5,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from minicop.zones import Zone
+
 
 class PositionEvent(BaseModel):
     """One position report from one ship, as produced by ingestion."""
@@ -54,3 +56,15 @@ class SensorTick(BaseModel):
     """Clock event for the (simulated) sensor: run one sweep at `now`."""
 
     now: datetime
+
+
+class ZoneAdded(BaseModel):
+    """An operator drew an area (phase 16), or one was loaded from the database."""
+
+    zone: Zone
+
+
+class ZoneRemoved(BaseModel):
+    """An operator deleted a drawn area (phase 16)."""
+
+    name: str

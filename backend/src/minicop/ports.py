@@ -136,6 +136,6 @@ def load_ports(path: Path = DEFAULT_PORTS_FILE) -> list[Zone]:
     """Port zones for the alert engines (kind="port": they raise no alerts)."""
     data = json.loads(path.read_text())
     return [
-        Zone(name=f"{p['name']} ({p['kind']})", kind="port", polygon=p["polygon"])
+        Zone(name=f"{p['name']} ({p['kind']})", kind="port", polygon=p["polygon"], source="port")
         for p in data["ports"]
     ]
