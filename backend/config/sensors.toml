@@ -1,0 +1,39 @@
+# SIMULATED non-cooperative sensor (phase 15). Not real data.
+# A patrol drone with a sensor that detects ships whether or not they transmit
+# AIS. Used to demonstrate and measure AIS + sensor fusion.
+
+[drone]
+id = "SIM-DRONE-1"
+speed_kn = 60
+footprint_nm = 5          # sensor radius around the drone
+sweep_s = 30              # one sweep (set of detections) every 30 s
+pd = 0.9                  # probability of detecting a ship inside the footprint
+position_sigma_m = 150    # detection position error (1 sigma)
+false_alarms_per_sweep = 0.5  # mean clutter detections per sweep (Poisson)
+seed = 7
+# Patrol loop, [lat, lon] — offshore Algarve, over the fishing grounds south of Portimão.
+patrol = [[36.95, -8.75], [36.95, -8.20], [36.75, -8.20], [36.75, -8.75]]
+
+# Scripted vessels that move but never transmit AIS (ground truth for evaluation).
+[[dark_targets]]
+name = "DARK-1"
+speed_kn = 6
+loop = true
+path = [[36.80, -8.70], [36.92, -8.45], [36.80, -8.25]]
+
+[[dark_targets]]
+name = "DARK-2"
+speed_kn = 3
+loop = true
+path = [[36.88, -8.30], [36.86, -8.32], [36.84, -8.29], [36.87, -8.27]]
+
+[fusion]
+track_max_age_min = 10    # AIS tracks older than this are not used for association
+gate_nm = 0.5             # association gate for a fresh AIS track...
+gate_growth_nm_per_min = 0.1  # ...widened by this per minute since its last report
+gate_max_nm = 2.0
+confirm_hits = 3          # M-of-N: a candidate is confirmed as dark after
+confirm_window = 5        # M detections in the last N sweeps
+candidate_gate_nm = 0.6   # unassociated detections join a candidate within this
+max_speed_kn = 40         # implied speed between a candidate's detections
+drop_after_min = 10       # forget a candidate/dark track with no detection for this long

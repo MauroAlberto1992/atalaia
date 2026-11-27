@@ -1,6 +1,6 @@
 # Phase 15 spec — Sensor fusion: finding "dark" vessels
 
-Status: proposed, waiting for approval.
+Status: approved.
 
 (User-drawn areas move to phase 16.)
 

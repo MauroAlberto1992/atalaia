@@ -35,6 +35,9 @@ class Track(BaseModel):
     navigational_status: int
     last_seen: datetime
     ais_class: str = "A"
+    # Last time a (simulated) sensor detection was associated with this AIS
+    # track (phase 15): "AIS + sensor" while recent.
+    sensor_seen: datetime | None = None
     stale: bool = False  # no report for STALE_AFTER (phase 5)
     distance_nm: float = 0.0  # over the stored history
     avg_speed_kn: float = 0.0
@@ -43,5 +46,11 @@ class Track(BaseModel):
 class Tick(BaseModel):
     """Clock event, put on the same queue as positions so that the state task
     (the single writer) is also the one that expires tracks."""
+
+    now: datetime
+
+
+class SensorTick(BaseModel):
+    """Clock event for the (simulated) sensor: run one sweep at `now`."""
 
     now: datetime
