@@ -57,6 +57,10 @@ class FusionConfig(BaseModel):
     candidate_gate_nm: float
     max_speed_kn: float
     drop_after_min: float
+    explain_max_age_min: float
+    explain_base_nm: float
+    explain_speed_factor: float
+    explain_speed_margin_kn: float
 
 
 class SensorsConfig(BaseModel):

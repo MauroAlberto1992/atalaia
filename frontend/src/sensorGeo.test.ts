@@ -9,6 +9,7 @@ const sweep: SensorSweep = {
 const dark = (id: string, confirmed: boolean): DarkTrack => ({
   id, lat: 36.88, lon: -8.45, sog: 6, cog: 210, detections: 4, confirmed,
   first_seen: "2026-11-27T09:58:00Z", last_seen: "2026-11-27T10:00:00Z",
+  possible_mmsi: null, possible_name: "", possible_ais_age_min: null,
 });
 
 describe("sensorToGeo", () => {
@@ -36,6 +37,13 @@ describe("dark info", () => {
     const fresh = { ...dark("D-3", true), sog: null, cog: null };
     const info = String(sensorToGeo(sweep, [fresh]).dark.features[0]?.properties?.info);
     expect(info).toContain("speed not yet known");
+  });
+
+  it("names the AIS ship that could explain a contact, and marks it grey", () => {
+    const maybe = { ...dark("D-4", true), possible_mmsi: 263000001, possible_name: "MAR AZUL", possible_ais_age_min: 12.4 };
+    const f = sensorToGeo(sweep, [maybe]).dark.features[0];
+    expect(String(f?.properties?.info)).toContain("possibly MAR AZUL (MMSI 263000001, AIS 12 min old)");
+    expect(f?.properties?.possible).toBe(true);
   });
 });
 

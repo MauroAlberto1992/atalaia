@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from minicop.events import Track
-from minicop.fusion import FusionEngine, associate, dead_reckon, gate_nm
+from minicop.fusion import FusionEngine, associate, dead_reckon, explain_by_ais, gate_nm
 from minicop.geo import haversine_nm
 from minicop.sensors import (
     Detection,
@@ -206,3 +206,54 @@ def test_implausible_hop_blocks_confirmation():
         t = T0 + timedelta(seconds=30 * k)
         out = eng.process(sweep(t, [det(*pos, t)]), tracks=[])
         assert out.newly_confirmed == []
+
+
+# ---- "could a recent AIS ship be there?" (sparse-AIS false darks) --------------
+
+
+def test_stale_ais_ship_within_reach_explains_a_contact():
+    # Stopped ship, last report 20 min ago: reach 0.5 + 2 kn x 1/3 h = 1.17 nm.
+    t = T0 + timedelta(minutes=20)
+    ship = track(7, *SEA, sog=0, cog=360)
+    got = explain_by_ais(*east(*SEA, 1.0), t, [ship], F)
+    assert got is not None and got[0].mmsi == 7 and got[1] == pytest.approx(20)
+    assert explain_by_ais(*east(*SEA, 1.4), t, [ship], F) is None  # beyond reach
+
+
+def test_ais_older_than_an_hour_explains_nothing():
+    ship = track(7, *SEA, sog=12)
+    assert explain_by_ais(*SEA, T0 + timedelta(minutes=61), [ship], F) is None
+
+
+def test_best_explanation_is_the_smallest_distance_to_reach_ratio():
+    t = T0 + timedelta(minutes=10)
+    far_fast = track(1, *east(*SEA, -2.5), sog=12)  # reach 0.5 + 20/6 = 3.83 nm, ratio 0.65
+    near_slow = track(2, *east(*SEA, -0.3), sog=0)  # reach 0.83 nm, ratio 0.36
+    got = explain_by_ais(*SEA, t, [far_fast, near_slow], F)
+    assert got is not None and got[0].mmsi == 2
+
+
+def run_contact(tracks: list[Track], sweeps: int = 6):
+    eng = FusionEngine(F)
+    outs = []
+    for k in range(sweeps):  # a stationary contact, seen every sweep
+        t = T0 + timedelta(minutes=30) + timedelta(seconds=30 * k)
+        outs.append(eng.process(sweep(t, [det(*SEA, t)]), tracks=tracks))
+    return outs
+
+
+def test_contact_explained_by_recent_ais_is_not_dark_and_does_not_alert():
+    # AIS 30 min old (too old to associate), stopped 0.5 nm away: reach 1.5 nm.
+    ship = track(9, *east(*SEA, 0.5), sog=0, cog=360)
+    outs = run_contact([ship])
+    assert all(not o.newly_confirmed for o in outs)
+    shown = outs[-1].dark[0]
+    assert shown.possible_mmsi == 9 and shown.possible_name == "S9"
+    assert shown.possible_ais_age_min == pytest.approx(32.5)
+
+
+def test_contact_no_ais_ship_can_reach_is_dark_and_alerts_once():
+    ship = track(9, *east(*SEA, 3.0), sog=0, cog=360)  # 3 nm > 1.5 nm reach
+    outs = run_contact([ship])
+    assert sum(len(o.newly_confirmed) for o in outs) == 1
+    assert outs[-1].dark[0].possible_mmsi is None

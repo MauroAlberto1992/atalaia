@@ -37,3 +37,8 @@ confirm_window = 5        # M detections in the last N sweeps
 candidate_gate_nm = 0.6   # unassociated detections join a candidate within this
 max_speed_kn = 40         # implied speed between a candidate's detections
 drop_after_min = 10       # forget a candidate/dark track with no detection for this long
+# Before calling a contact dark: could any AIS ship seen recently be there?
+explain_max_age_min = 60       # AIS tracks up to this old are checked (state keeps 60 min)
+explain_base_nm = 0.5          # reach = base + (SOG x factor + margin) x time since report
+explain_speed_factor = 1.5
+explain_speed_margin_kn = 2.0

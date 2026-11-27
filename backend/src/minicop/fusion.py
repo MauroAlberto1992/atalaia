@@ -12,6 +12,9 @@ be compared against):
 4. Unmatched detections feed candidate non-cooperative tracks. A candidate is
    confirmed as a DARK track after M detections in the last N sweeps, with
    physically plausible speed between them. Isolated clutter never confirms.
+5. Before a confirmed contact is reported as dark, check whether any AIS ship
+   seen in the last hour (stale ones too) could have reached it. If so, it is
+   only a "possible AIS" contact: no alert. Re-checked every sweep.
 """
 
 import math
@@ -46,6 +49,34 @@ def dead_reckon(track: Track, t: datetime) -> tuple[float, float]:
 def gate_nm(cfg: FusionConfig, age: timedelta) -> float:
     minutes = max(0.0, age.total_seconds() / 60)
     return min(cfg.gate_max_nm, cfg.gate_nm + cfg.gate_growth_nm_per_min * minutes)
+
+
+def explain_by_ais(
+    lat: float, lon: float, t: datetime, tracks: list[Track], cfg: FusionConfig
+) -> tuple[Track, float] | None:
+    """The AIS track that could best be at (lat, lon) at `t`, or None.
+
+    Reach is deliberately generous: from the *last reported* position (no dead
+    reckoning, since the ship may have turned), at the reported speed x factor
+    plus a margin (a stopped ship can start moving). Returns (track, minutes
+    since its report); the best is the smallest distance / reach ratio."""
+    max_age = timedelta(minutes=cfg.explain_max_age_min)
+    best: tuple[float, Track] | None = None
+    for tr in tracks:
+        age = t - tr.last_seen
+        if not timedelta(0) <= age <= max_age:
+            continue
+        hours = age.total_seconds() / 3600
+        reach = (
+            cfg.explain_base_nm
+            + (tr.sog * cfg.explain_speed_factor + cfg.explain_speed_margin_kn) * hours
+        )
+        ratio = haversine_nm(lat, lon, tr.latitude, tr.longitude) / reach
+        if ratio <= 1 and (best is None or ratio < best[0]):
+            best = (ratio, tr)
+    if best is None:
+        return None
+    return best[1], (t - best[1].last_seen).total_seconds() / 60
 
 
 def associate(
@@ -88,6 +119,10 @@ class DarkTrack(BaseModel):
     first_seen: datetime
     last_seen: datetime
     confirmed: bool
+    # Set when a recently seen AIS ship could be there: not dark, no alert.
+    possible_mmsi: int | None = None
+    possible_name: str = ""
+    possible_ais_age_min: float | None = None
     source: str = "sensor"  # vs "ais" / "ais+sensor" for AIS tracks
 
 
@@ -97,6 +132,8 @@ class _Candidate:
     points: list[Detection] = field(default_factory=list)
     hit_sweeps: list[int] = field(default_factory=list)  # sweep numbers with a hit
     confirmed: bool = False
+    alerted: bool = False  # reported as dark (alert sent) at least once
+    explained: tuple[Track, float] | None = None  # latest AIS explanation
 
     @property
     def last(self) -> Detection:
@@ -118,8 +155,8 @@ class _Candidate:
 @dataclass
 class SweepOutcome:
     fused: dict[int, datetime]  # mmsi -> time confirmed by the sensor
-    newly_confirmed: list[DarkTrack]
-    dark: list[DarkTrack]  # all current confirmed dark tracks
+    newly_confirmed: list[DarkTrack]  # became dark this sweep: alert once
+    dark: list[DarkTrack]  # all current confirmed contacts, "possible AIS" ones included
 
 
 class FusionEngine:
@@ -135,7 +172,6 @@ class FusionEngine:
         matched, unmatched = associate(sweep.detections, tracks, t, self.cfg)
         fused = {mmsi: t for mmsi in matched.values()}
 
-        newly: list[_Candidate] = []
         for i in unmatched:
             det = sweep.detections[i]
             cand = self._nearest_candidate(det)
@@ -148,11 +184,21 @@ class FusionEngine:
                 cand.hit_sweeps.append(self._sweep_no)
             if not cand.confirmed and self._should_confirm(cand):
                 cand.confirmed = True
-                newly.append(cand)
 
         # Forget candidates and dark tracks not seen for a while.
         drop = timedelta(minutes=self.cfg.drop_after_min)
         self._candidates = [c for c in self._candidates if t - c.last.time <= drop]
+
+        # Could a recently seen AIS ship be there? Re-checked every sweep, so a
+        # contact becomes dark (and alerts) once no AIS ship can explain it.
+        newly: list[_Candidate] = []
+        for c in self._candidates:
+            if not c.confirmed:
+                continue
+            c.explained = explain_by_ais(c.last.lat, c.last.lon, t, tracks, self.cfg)
+            if c.explained is None and not c.alerted:
+                c.alerted = True
+                newly.append(c)
         dark = [self._as_dark(c) for c in self._candidates if c.confirmed]
         return SweepOutcome(
             fused=fused, newly_confirmed=[self._as_dark(c) for c in newly], dark=dark
@@ -200,6 +246,7 @@ class FusionEngine:
     def _as_dark(self, c: _Candidate) -> DarkTrack:
         v = c.velocity()
         sog, cog = v if v else (None, None)
+        tr, age = c.explained if c.explained else (None, None)
         return DarkTrack(
             id=c.id,
             lat=c.last.lat,
@@ -210,4 +257,7 @@ class FusionEngine:
             first_seen=c.points[0].time,
             last_seen=c.last.time,
             confirmed=c.confirmed,
+            possible_mmsi=tr.mmsi if tr else None,
+            possible_name=tr.ship_name if tr else "",
+            possible_ais_age_min=age,
         )

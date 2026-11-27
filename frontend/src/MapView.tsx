@@ -211,13 +211,14 @@ export function MapView() {
       map.addSource("dark-tracks", { type: "geojson", data: emptySensor.dark });
       map.addImage("drone", droneIcon(), { pixelRatio: ICON_PIXEL_RATIO });
       map.addImage("dark", darkIcon(), { pixelRatio: ICON_PIXEL_RATIO });
+      map.addImage("possible-ais", darkIcon("#94a3b8", "#e2e8f0"), { pixelRatio: ICON_PIXEL_RATIO });
       map.addLayer({ id: "sensor-footprint-fill", type: "fill", source: "sensor-footprint", paint: { "fill-color": "#f8fafc", "fill-opacity": 0.04 } });
       map.addLayer({ id: "sensor-footprint-line", type: "line", source: "sensor-footprint", paint: { "line-color": "#f8fafc", "line-opacity": 0.35, "line-width": 1, "line-dasharray": [4, 3] } });
       map.addLayer({ id: "sensor-detections", type: "circle", source: "sensor-detections", layout: { visibility: "none" }, paint: { "circle-radius": 3, "circle-color": "#f8fafc", "circle-opacity": 0.5 } });
       map.addLayer({ id: "sensor-drone", type: "symbol", source: "sensor-drone", layout: { "icon-image": "drone", "icon-allow-overlap": true } });
       map.addLayer({
         id: "dark-tracks", type: "symbol", source: "dark-tracks",
-        layout: { "icon-image": "dark", "icon-allow-overlap": true, "text-field": ["get", "id"], "text-offset": [0, 1.3], "text-size": 11, "text-allow-overlap": true },
+        layout: { "icon-image": ["case", ["get", "possible"], "possible-ais", "dark"], "icon-allow-overlap": true, "text-field": ["get", "id"], "text-offset": [0, 1.3], "text-size": 11, "text-allow-overlap": true },
         paint: { "text-color": "#fca5a5", "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
       });
       const darkPopup = new Popup({ closeButton: true });

@@ -118,4 +118,8 @@ export interface DarkTrack {
   first_seen: string;
   last_seen: string;
   confirmed: boolean;
+  // Set when an AIS ship seen in the last hour could be there: not dark, no alert.
+  possible_mmsi: number | null;
+  possible_name: string;
+  possible_ais_age_min: number | null;
 }

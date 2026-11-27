@@ -91,7 +91,7 @@ Keep company names out of user-facing text (README, UI); they live here only.
 13. Class B vessels (small craft): messages 18/19, ais_class everywhere, smaller icon.
 14. Routes from the database: window 1 h-7 d, segments split at gaps, honest drawing, recent ships.
 15. Sensor fusion (SIMULATED drone sensor): AIS association, dark-vessel tracks and alerts, evaluation.
-Next: fix sparse-AIS false darks (see phase-15.md), 16 user-drawn areas.
+Next: 16 user-drawn areas. (Sparse-AIS false darks: mitigated, 38 -> 4; a dark vessel next to AIS ships can hide, see phase-15.md.)
 
 ## Layout
 ```

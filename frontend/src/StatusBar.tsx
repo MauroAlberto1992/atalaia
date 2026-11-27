@@ -8,7 +8,7 @@ export function StatusBar() {
   const connection = useTrackStore((s) => s.connection);
   const unseen = useTrackStore((s) => s.unseen);
   const sensorOn = useTrackStore((s) => s.sensor !== null);
-  const darkCount = useTrackStore((s) => s.dark.filter((d) => d.confirmed).length);
+  const darkCount = useTrackStore((s) => s.dark.filter((d) => d.confirmed && d.possible_mmsi === null).length);
   const showDetections = useTrackStore((s) => s.showDetections);
   const toggleDetections = useTrackStore((s) => s.toggleDetections);
   return (

@@ -11,6 +11,8 @@ Reported per scenario:
 - dark targets confirmed, and how long after first entering the footprint;
 - false dark contacts: confirmed contacts that were really clutter;
 - AIS ships wrongly reported as dark;
+- contacts explained by recent AIS ("possible AIS", no alert): right MMSI or
+  not, and dark targets hidden that way (the risk of the check);
 - association accuracy: detections of AIS ships matched to the right MMSI.
 """
 
@@ -64,6 +66,7 @@ def run(
     confirmed_at: dict[str, datetime] = {}
     assoc: Counter[str] = Counter()  # right / wrong / missed for AIS-ship detections
     confirmed_truths: Counter[str] = Counter()
+    explained: dict[str, str] = {}  # contact id -> "right" / "wrong mmsi" / "dark" / "clutter"
 
     for k in range(sweeps):
         t = T0 + timedelta(seconds=cfg.drone.sweep_s * k)
@@ -112,6 +115,18 @@ def run(
                     "missed" if mmsi is None else ("right" if f"ais:{mmsi}" == d.truth else "wrong")
                 ] += 1
 
+        for c in out.dark:
+            if c.possible_mmsi is not None and c.id not in explained:
+                cand = next(x for x in fusion._candidates if x.id == c.id)
+                tr = Counter(p.truth for p in cand.points).most_common(1)[0][0] or "?"
+                explained[c.id] = (
+                    "right MMSI"
+                    if tr == f"ais:{c.possible_mmsi}"
+                    else "wrong MMSI"
+                    if tr.startswith("ais:")
+                    else tr.split(":")[0]
+                )
+
         for dark in out.newly_confirmed:
             # Evaluation only: majority ground truth of the contact's detections.
             cand = next(c for c in fusion._candidates if c.id == dark.id)
@@ -131,6 +146,7 @@ def run(
         "time to confirm (min)": {n: round(v, 1) for n, v in latencies.items()},
         "false dark (clutter)": confirmed_truths.get("clutter", 0),
         "AIS ships reported dark": confirmed_truths.get("ais", 0),
+        "explained by recent AIS": dict(Counter(explained.values())),
         "AIS detections -> right MMSI": f"{100 * assoc['right'] / total_assoc:.1f}%",
         "-> wrong MMSI": f"{100 * assoc['wrong'] / total_assoc:.1f}%",
         "-> unassociated": f"{100 * assoc['missed'] / total_assoc:.1f}%",

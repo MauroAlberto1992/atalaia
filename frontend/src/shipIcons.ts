@@ -72,8 +72,9 @@ export const chevronIcon = () =>
     ctx.stroke();
   });
 
-// Dark vessel (sensor contact with no AIS): red diamond.
-export const darkIcon = () =>
+// Dark vessel (sensor contact with no AIS): red diamond. Grey: a contact a
+// recently seen AIS ship could explain ("possible AIS").
+export const darkIcon = (fill = "#ef4444", stroke = "#fecaca") =>
   draw((ctx, s) => {
     ctx.beginPath();
     ctx.moveTo(s / 2, s / 2 - 8);
@@ -81,8 +82,8 @@ export const darkIcon = () =>
     ctx.lineTo(s / 2, s / 2 + 8);
     ctx.lineTo(s / 2 - 7, s / 2);
     ctx.closePath();
-    ctx.fillStyle = "#ef4444";
-    ctx.strokeStyle = "#fecaca";
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
     ctx.lineWidth = 1.5;
     ctx.fill();
     ctx.stroke();

@@ -21,6 +21,11 @@ export function circleRing(lat: number, lon: number, radiusNm: number, sides = 6
 }
 
 export function darkInfo(d: DarkTrack): string {
+  if (d.possible_mmsi !== null) {
+    const who = d.possible_name || `MMSI ${d.possible_mmsi}`;
+    const age = (d.possible_ais_age_min ?? 0).toFixed(0);
+    return `${d.id}: possibly ${who} (MMSI ${d.possible_mmsi}, AIS ${age} min old): no alert. SIMULATED sensor.`;
+  }
   const motion =
     d.sog !== null && d.cog !== null
       ? `~${d.sog.toFixed(0)} kn heading ${d.cog.toFixed(0)}°`
@@ -46,7 +51,7 @@ export function sensorToGeo(sweep: SensorSweep | null, dark: DarkTrack[]): Senso
     dark: {
       type: "FeatureCollection",
       features: dark.filter((d) => d.confirmed).map((d) => ({ type: "Feature" as const,
-        properties: { id: d.id, info: darkInfo(d) },
+        properties: { id: d.id, info: darkInfo(d), possible: d.possible_mmsi !== null },
         geometry: { type: "Point" as const, coordinates: [d.lon, d.lat] } })),
     },
   };

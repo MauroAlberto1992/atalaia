@@ -64,3 +64,25 @@ There is no free real radar, SAR or drone feed. The sensor is a **simulator**:
 - All guardrails and CI pass.
 - The evaluation report (in the phase summary) gives the numbers above for the default configuration, plus at least one harder setting (lower Pd or more clutter). **The weaknesses are stated, not hidden.**
 - A live run on the developer's Mac shows the drone patrolling over real AIS traffic: real ships fused, and a scripted dark target confirmed and alerted.
+
+## Addendum: check recent AIS before calling a contact dark (approved)
+
+Problem (measured with `scripts/evaluate_fusion.py`): with sparse AIS (reports up
+to 15 min old), 38 AIS ships were reported dark, because association only uses
+tracks up to 10 min old with a gate capped at 2 nm.
+
+Change: before a confirmed contact is reported as dark, every AIS track seen in
+the last 60 min (stale ones included) is checked for **reachability**:
+
+    distance(last AIS position, contact) <= 0.5 nm + (SOG x 1.5 + 2 kn) x time since that report
+
+- If some track could be there, the contact is *not* dark: it is shown as
+  "possibly MMSI X (AIS N min old)", grey diamond, no alert. With several
+  candidates, the one with the smallest distance / reach ratio is chosen.
+- Re-checked every sweep: if no track can explain it any more, it becomes dark
+  and the alert fires then.
+- Otherwise it is dark, as before.
+
+Acceptance: the evaluation also reports "dark targets explained by AIS (missed)";
+false darks in the sparse scenario drop clearly, and the results (good or bad)
+are written in phase-15.md. Thresholds in `config/sensors.toml`.
