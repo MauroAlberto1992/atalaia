@@ -17,6 +17,7 @@ import { useEffect, useRef } from "react";
 import { routeBounds, routeToGeo } from "./routeGeo";
 import { chevronIcon, darkIcon, droneIcon, ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
 import { type DarkInfo, sensorToGeo } from "./sensorGeo";
+import { zoneLabelPoints } from "./zoneLabels";
 import { useTrackStore } from "./store";
 import type { LngLat, Track, Zone } from "./types";
 
@@ -155,24 +156,28 @@ export function MapView() {
       map.addSource("ships", { type: "geojson", data: toGeoJSON(useTrackStore.getState().tracks) });
       // Zones, drawn first so they sit under routes and ships.
       map.addSource("zones", { type: "geojson", data: zonesGeoJSON([]) });
+      map.addSource("zone-labels", { type: "geojson", data: zoneLabelPoints([]) });
       map.addLayer({ id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": ZONE_COLOR, "fill-opacity": ["case", IS_PORT, 0.05, 0.12] } });
       map.addLayer({ id: "zones-line", type: "line", source: "zones", paint: { "line-color": ZONE_COLOR, "line-width": 1.5, "line-dasharray": [3, 2], "line-opacity": ["case", IS_PORT, 0.4, 1] } });
       map.addLayer({
-        id: "zones-label", type: "symbol", source: "zones",
+        id: "zones-label", type: "symbol", source: "zone-labels", // one point per zone
         filter: ["!", IS_PORT],
         layout: { "text-field": ["get", "name"], "text-size": 11 },
         paint: { "text-color": ZONE_COLOR, "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
       });
       // Port names (hundreds, from OpenStreetMap) only when zoomed in.
       map.addLayer({
-        id: "ports-label", type: "symbol", source: "zones", minzoom: 12,
+        id: "ports-label", type: "symbol", source: "zone-labels", minzoom: 12,
         filter: IS_PORT,
         layout: { "text-field": ["get", "name"], "text-size": 10 },
         paint: { "text-color": ZONE_COLOR, "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
       });
       fetch("/api/zones")
         .then((r) => r.json())
-        .then((zones: Zone[]) => (map.getSource("zones") as GeoJSONSource).setData(zonesGeoJSON(zones)))
+        .then((zones: Zone[]) => {
+          void (map.getSource("zones") as GeoJSONSource).setData(zonesGeoJSON(zones));
+          void (map.getSource("zone-labels") as GeoJSONSource).setData(zoneLabelPoints(zones));
+        })
         .catch(() => {});
 
       // Route of the selected ship, drawn under the ship icons.
