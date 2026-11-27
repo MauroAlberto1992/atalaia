@@ -65,6 +65,8 @@ class TrackStore:
             navigational_status=event.navigational_status,
             last_seen=event.received_at,
             ais_class=event.ais_class,
+            # A new AIS report must not erase the last sensor confirmation.
+            sensor_seen=current.sensor_seen if current else None,
             distance_nm=stats.distance_nm,
             avg_speed_kn=stats.avg_speed_kn,
         )
@@ -90,6 +92,15 @@ class TrackStore:
                 self._tracks[mmsi] = track.model_copy(update={"stale": True})
                 result.stale.append(mmsi)
         return result
+
+    def mark_sensor(self, mmsi: int, t: datetime) -> Track | None:
+        """A sensor detection was associated with this AIS track (phase 15)."""
+        track = self._tracks.get(mmsi)
+        if track is None:
+            return None
+        updated = track.model_copy(update={"sensor_seen": t})
+        self._tracks[mmsi] = updated
+        return updated
 
     def get(self, mmsi: int) -> Track | None:
         return self._tracks.get(mmsi)

@@ -156,3 +156,49 @@ def test_route_and_ships_need_a_database():
         assert client.get("/tracks/1/route").status_code == 503
         assert client.get("/ships").status_code == 503
         assert client.get("/tracks/1/route?hours=500").status_code == 422  # max 7 days
+
+
+def test_simulated_sensor_end_to_end():
+    """SensorTicks through the state task: a scripted dark target is confirmed,
+    raises a dark_vessel alert, and appears on /live; the sweep is marked
+    simulated and carries no ground truth."""
+    from minicop.events import SensorTick
+
+    app = create_app(ingest=False, zones=[], simulated_sensor=True)
+    with TestClient(app) as client:
+        sensor = app.state.runtime.sensor
+        start = sensor.sim.start
+        # Up to 3 simulated hours, one sweep every 30 s, until the alert fires.
+        for k in range(1, 360):
+            client.portal.call(feed, app, SensorTick(now=start + timedelta(seconds=30 * k)))
+            if any(a["kind"] == "dark_vessel" for a in client.get("/alerts").json()):
+                break
+        alerts = [a for a in client.get("/alerts").json() if a["kind"] == "dark_vessel"]
+        assert alerts and "SIMULATED" in alerts[0]["message"]
+        assert alerts[0]["lat"] is not None
+        with client.websocket_connect("/live") as ws:
+            snap = ws.receive_json()
+        assert snap["sensor"]["simulated"] is True
+        assert all("truth" not in d for d in snap["sensor"]["detections"])
+        assert any(d["confirmed"] for d in snap["dark"])
+
+
+def test_simulated_sensor_is_off_by_default():
+    app = create_app(ingest=False)
+    with TestClient(app) as client:
+        assert app.state.runtime.sensor is None
+        with client.websocket_connect("/live") as ws:
+            assert ws.receive_json()["dark"] == []
+
+
+def test_demo_overrides_speed_up_only_the_drone():
+    from minicop.api import apply_demo_overrides
+    from minicop.sensors import load_sensors_config
+
+    cfg = load_sensors_config()
+    assert apply_demo_overrides(cfg, {}) is cfg
+    fast = apply_demo_overrides(
+        cfg, {"MINICOP_SENSOR_SWEEP_S": "1", "MINICOP_DRONE_SPEED_KN": "600"}
+    )
+    assert fast.drone.sweep_s == 1 and fast.drone.speed_kn == 600
+    assert fast.dark_targets == cfg.dark_targets  # dark targets keep their real speed

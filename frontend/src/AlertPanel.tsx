@@ -21,6 +21,7 @@ const ICON: Record<Alert["kind"], string> = {
   spoofing: "⚠",
   coverage_lost: "⊘",
   coverage_restored: "⊕",
+  dark_vessel: "◆",
 };
 
 const GROUP_LABEL: Record<AlertGroup, string> = { zones: "Zones", behaviour: "Behaviour", system: "System" };

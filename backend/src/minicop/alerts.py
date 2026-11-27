@@ -33,6 +33,8 @@ class AlertKind(StrEnum):
     # Sensor coverage (coverage.py): about our reception, not about a ship.
     COVERAGE_LOST = "coverage_lost"
     COVERAGE_RESTORED = "coverage_restored"
+    # Sensor fusion (fusion.py): a sensor contact no AIS track explains.
+    DARK_VESSEL = "dark_vessel"
 
 
 class Alert(BaseModel):
@@ -44,6 +46,9 @@ class Alert(BaseModel):
     at: datetime
     message: str  # human-readable reason, with the numbers behind it
     other_mmsi: int | None = None  # second ship, for rendezvous
+    # Where it happened, for alerts not tied to an AIS ship (dark vessels).
+    lat: float | None = None
+    lon: float | None = None
 
 
 class AlertEngine:
@@ -62,6 +67,8 @@ class AlertEngine:
         message: str,
         zone: str | None = None,
         other_mmsi: int | None = None,
+        lat: float | None = None,
+        lon: float | None = None,
     ) -> Alert:
         """Create and keep an alert. Public so the anomaly detector shares the
         same id sequence and recent-alerts list."""
@@ -74,6 +81,8 @@ class AlertEngine:
             at=at,
             message=message,
             other_mmsi=other_mmsi,
+            lat=lat,
+            lon=lon,
         )
         self._next_id += 1
         self._alerts.append(alert)

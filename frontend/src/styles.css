@@ -36,6 +36,8 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .panel dt { color: var(--muted); }
 .panel dd { margin: 0; }
 
+.status .sim { color: #fbbf24; font-size: 11px; letter-spacing: 0.05em; }
+.status .dark-count { color: #fca5a5; }
 .badge { background: #dc2626; color: white; border-radius: 10px; padding: 1px 8px; }
 
 .alerts {
@@ -75,13 +77,18 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .alert.spoofing .icon { color: #f43f5e; }
 .alert.coverage_lost .icon { color: #94a3b8; }
 .alert.coverage_restored .icon { color: #22c55e; }
+.alert.dark_vessel .icon { color: #ef4444; }
 
 .panel .windows { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
 .note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 .note.error { color: #f87171; }
 
-.recent {
+.left-stack {
   position: absolute; top: 60px; left: 12px; width: 280px; max-width: calc(100% - 24px);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+}
+.recent {
+  width: 100%;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 12px;
 }
 .recent-toggle {
@@ -103,7 +110,33 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .dot.class-B { background: #4ade80; }
 
 @media (max-width: 600px) {
-  .recent { top: 56px; width: auto; right: 12px; }
+  .left-stack { top: 56px; width: auto; right: 12px; }
   .alerts { bottom: auto; top: 56px; max-height: 25vh; }
   .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; }
 }
+
+/* Sensor contact popup (phase 15): dark, like the panels. */
+.contact-popup .maplibregl-popup-content {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  font: 12px/1.5 ui-monospace, monospace;
+  padding: 10px 28px 10px 12px;
+  max-width: 300px;
+}
+.contact-popup .maplibregl-popup-tip { border-top-color: #334155; border-bottom-color: #334155; }
+.contact-popup .maplibregl-popup-close-button { color: #94a3b8; font-size: 16px; }
+.contact-popup .contact-title { font-weight: bold; margin-bottom: 4px; }
+.contact-popup .contact-title.dark { color: #fca5a5; }
+.contact-popup .contact-title.possible { color: #cbd5e1; }
+.contact-popup button {
+  margin-top: 6px; background: #1e293b; color: #7dd3fc; border: 1px solid #334155;
+  border-radius: 4px; padding: 2px 8px; font: inherit; cursor: pointer;
+}
+
+/* "Whole area" button, under the recent ships list. */
+.home-button {
+  padding: 5px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
+}
+.home-button:hover { background: #1e293b; }

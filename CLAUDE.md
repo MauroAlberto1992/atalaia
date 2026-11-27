@@ -90,7 +90,8 @@ Keep company names out of user-facing text (README, UI); they live here only.
 12. Record every position in TimescaleDB/PostGIS.
 13. Class B vessels (small craft): messages 18/19, ais_class everywhere, smaller icon.
 14. Routes from the database: window 1 h-7 d, segments split at gaps, honest drawing, recent ships.
-Next: 15 user-drawn areas (or sensor fusion first, see README priorities).
+15. Sensor fusion (SIMULATED drone sensor): AIS association, dark-vessel tracks and alerts, evaluation.
+Next: 16 user-drawn areas. (Sparse-AIS false darks: mitigated, 38 -> 4; a dark vessel next to AIS ships can hide, see phase-15.md.)
 
 ## Layout
 ```
@@ -128,4 +129,9 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
   plausible-sounding one. An empty section is better than an invented one.
 - Test a diagnosis before applying the fix (e.g. pg_isready socket vs TCP turned out to make no difference).
 - Integration tests against the real dependency catch what unit tests with assumptions miss.
+- `git stash` does not stash new untracked files: to compare before/after for a new file, patch in memory.
+- A probabilistic rule (M-of-N) has a non-zero false-alarm rate: test that it is bounded, not zero.
 - Keep test data clearly on one side of a threshold (e.g. chord vs arc made 4 kn fall just under 2 nm).
+- A demo/speed option is verified by its end result (contacts confirmed), not only by its inputs (drone moving).
+- In a simulated scenario, measure that the sensor actually sees the targets before handing it over.
+- Editing a file back and forth within a second can leave a stale `__pycache__`: clear it, or mutate in memory.

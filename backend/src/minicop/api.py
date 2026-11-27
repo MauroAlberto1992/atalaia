@@ -7,8 +7,8 @@ import asyncio
 import contextlib
 import logging
 import os
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
@@ -16,11 +16,12 @@ import asyncpg
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
-from minicop.alerts import Alert, AlertEngine
+from minicop.alerts import Alert, AlertEngine, AlertKind
 from minicop.anomalies import AnomalyConfig, AnomalyDetector, load_anomaly_config
 from minicop.config import Area, load_settings
 from minicop.coverage import CoverageConfig, CoverageMonitor, load_coverage_config
-from minicop.events import PositionEvent, Tick, Track
+from minicop.events import PositionEvent, SensorTick, Tick, Track
+from minicop.fusion import DarkTrack, FusionEngine
 from minicop.history import HistoryPoint, HistoryStats
 from minicop.history_db import HistoryDB, ShipSeen, window_start
 from minicop.hub import Hub
@@ -28,6 +29,7 @@ from minicop.ingest import IngestStatus, run_ingestion
 from minicop.ports import load_ports
 from minicop.recorder import Recorder
 from minicop.routes import MAX_POINTS, RoutePoint, RouteStats, route_stats, split_segments, thin
+from minicop.sensors import DroneSimulator, SensorsConfig, load_sensors_config
 from minicop.state import TrackStore
 from minicop.zones import Zone, load_zones
 
@@ -37,7 +39,7 @@ EVENT_QUEUE_SIZE = 10_000
 SWEEP_INTERVAL_S = 30
 
 # Positions from ingestion and clock ticks share one queue (single writer).
-EventQueue = asyncio.Queue[PositionEvent | Tick]
+EventQueue = asyncio.Queue[PositionEvent | Tick | SensorTick]
 
 
 class RouteResponse(BaseModel):
@@ -62,6 +64,7 @@ async def run_state(
     coverage: CoverageMonitor,
     hub: Hub,
     recorder: Recorder | None = None,
+    sensor: "SimulatedSensor | None" = None,
 ) -> None:
     """The only task that mutates the store, the alert engine and the anomaly detector.
     Publishes every change to the hub."""
@@ -73,7 +76,11 @@ async def run_state(
     while True:
         event = await events.get()
         try:
-            if isinstance(event, Tick):
+            if isinstance(event, SensorTick):
+                if sensor is not None:
+                    for message in sensor.step(event.now, store, engine):
+                        hub.publish(message)
+            elif isinstance(event, Tick):
                 result = store.sweep(event.now)
                 for mmsi in result.stale:
                     hub.publish({"type": "stale", "mmsi": mmsi})  # map greys it now
@@ -118,6 +125,73 @@ async def run_state(
             events.task_done()  # lets tests await events.join()
 
 
+@dataclass
+class SimulatedSensor:
+    """The SIMULATED patrol drone and the AIS + sensor fusion (phase 15).
+    Stepped by the state task (single writer) on every SensorTick."""
+
+    sim: DroneSimulator
+    fusion: FusionEngine
+    sweep_s: float
+    last_sweep: dict[str, object] | None = None  # public sweep, for /live snapshots
+    dark: list[DarkTrack] = field(default_factory=list)
+
+    def step(
+        self, now: datetime, store: TrackStore, engine: AlertEngine
+    ) -> list[dict[str, object]]:
+        tracks = store.snapshot()
+        sweep = self.sim.sweep(now, tracks)
+        outcome = self.fusion.process(sweep, tracks)
+        messages: list[dict[str, object]] = []
+        for mmsi, t in outcome.fused.items():
+            updated = store.mark_sensor(mmsi, t)
+            if updated is not None:
+                messages.append({"type": "track", "track": updated.model_dump(mode="json")})
+        # The ground truth of each detection is for evaluation only: not published.
+        self.last_sweep = {
+            "simulated": True,
+            **sweep.model_dump(mode="json", exclude={"detections": {"__all__": {"truth"}}}),
+        }
+        self.dark = outcome.dark
+        messages.append({"type": "sensor", "sweep": self.last_sweep})
+        messages.append({"type": "dark", "tracks": [d.model_dump(mode="json") for d in self.dark]})
+        for d in outcome.newly_confirmed:
+            stand_in = Track(  # alerts are keyed by ship; a dark contact has no MMSI
+                mmsi=0,
+                ship_name=d.id,
+                latitude=d.lat,
+                longitude=d.lon,
+                sog=d.sog or 0.0,
+                cog=d.cog if d.cog is not None else 360.0,  # 360 = "not available"
+                true_heading=511,
+                navigational_status=15,
+                last_seen=d.last_seen,
+            )
+            motion = (
+                f"~{d.sog:.0f} kn heading {d.cog:.0f}°"
+                if d.sog is not None and d.cog is not None
+                else "speed not yet known"
+            )
+            alert = engine.record(
+                AlertKind.DARK_VESSEL,
+                stand_in,
+                d.last_seen,
+                f"Non-cooperative contact {d.id}: {d.detections} sensor detections, no AIS, "
+                f"{motion} (SIMULATED sensor)",
+                lat=d.lat,
+                lon=d.lon,
+            )
+            messages.append({"type": "alert", "alert": alert.model_dump(mode="json")})
+        return messages
+
+
+async def run_sensor_clock(events: EventQueue, sweep_s: float) -> None:
+    """Puts a SensorTick on the event queue every sweep."""
+    while True:
+        await asyncio.sleep(sweep_s)
+        await events.put(SensorTick(now=datetime.now(UTC)))
+
+
 async def run_clock(events: EventQueue) -> None:
     """Puts a Tick on the event queue every SWEEP_INTERVAL_S."""
     while True:
@@ -141,8 +215,40 @@ class Runtime:
     coverage: CoverageMonitor
     recorder: Recorder | None  # None when DATABASE_URL is not set
     history_db: HistoryDB | None  # read side of the recorded history (phase 14)
+    sensor: SimulatedSensor | None  # SIMULATED drone + fusion (phase 15), off by default
     status: IngestStatus
     area: Area | None
+
+
+def apply_demo_overrides(cfg: SensorsConfig, env: Mapping[str, str]) -> SensorsConfig:
+    """Optional overrides to watch the simulation without waiting:
+    MINICOP_SENSOR_SWEEP_S (seconds between sweeps, config: 30) and
+    MINICOP_DRONE_SPEED_KN (config: 60 kn, one patrol loop in ~77 min).
+    Only the drone is sped up; the scripted dark targets keep their real speed,
+    so the fusion's plausible-speed check still applies to them."""
+    drone: dict[str, float] = {}
+    if env.get("MINICOP_SENSOR_SWEEP_S", "").strip():
+        drone["sweep_s"] = float(env["MINICOP_SENSOR_SWEEP_S"])
+    if env.get("MINICOP_DRONE_SPEED_KN", "").strip():
+        drone["speed_kn"] = float(env["MINICOP_DRONE_SPEED_KN"])
+    if not drone:
+        return cfg
+    return cfg.model_copy(update={"drone": cfg.drone.model_copy(update=drone)})
+
+
+def _simulated_sensor(enabled: bool | None, cfg: SensorsConfig | None) -> SimulatedSensor | None:
+    """The simulated sensor is OFF unless asked for (MINICOP_SIMULATED_SENSOR=1),
+    so simulated contacts are never mixed into a picture by accident."""
+    if enabled is None:
+        enabled = os.getenv("MINICOP_SIMULATED_SENSOR", "0").strip() == "1"
+    if not enabled:
+        return None
+    cfg = apply_demo_overrides(cfg or load_sensors_config(), os.environ)
+    return SimulatedSensor(
+        sim=DroneSimulator(cfg, start=datetime.now(UTC)),
+        fusion=FusionEngine(cfg.fusion),
+        sweep_s=cfg.drone.sweep_s,
+    )
 
 
 def _history_db_from_env() -> HistoryDB | None:
@@ -176,6 +282,8 @@ def create_app(
     zones: list[Zone] | None = None,
     anomaly_config: AnomalyConfig | None = None,
     coverage_config: CoverageConfig | None = None,
+    simulated_sensor: bool | None = None,
+    sensors_config: SensorsConfig | None = None,
 ) -> FastAPI:
     """ingest=False skips aisstream (and the API key); tests feed
     app.state.runtime.events. zones defaults to config/zones.toml; tests pass their own."""
@@ -197,6 +305,7 @@ def create_app(
             coverage=CoverageMonitor(coverage_cfg, alert_engine),
             recorder=_recorder_from_env(),
             history_db=_history_db_from_env(),
+            sensor=_simulated_sensor(simulated_sensor, sensors_config),
             status=IngestStatus(),
             area=settings.area if settings else None,
         )
@@ -204,10 +313,22 @@ def create_app(
         tasks = [
             asyncio.create_task(
                 run_state(
-                    rt.events, rt.store, rt.alerts, rt.anomalies, rt.coverage, rt.hub, rt.recorder
+                    rt.events,
+                    rt.store,
+                    rt.alerts,
+                    rt.anomalies,
+                    rt.coverage,
+                    rt.hub,
+                    rt.recorder,
+                    rt.sensor,
                 )
             ),
             asyncio.create_task(run_clock(rt.events)),
+            *(
+                [asyncio.create_task(run_sensor_clock(rt.events, rt.sensor.sweep_s))]
+                if rt.sensor is not None
+                else []
+            ),
         ]
         if rt.recorder is not None:
             tasks.append(asyncio.create_task(rt.recorder.run()))
@@ -313,6 +434,8 @@ def create_app(
             "type": "snapshot",
             "tracks": [t.model_dump(mode="json") for t in rt.store.snapshot()],
             "alerts": [a.model_dump(mode="json") for a in rt.alerts.recent()],
+            "sensor": rt.sensor.last_sweep if rt.sensor else None,
+            "dark": [d.model_dump(mode="json") for d in rt.sensor.dark] if rt.sensor else [],
         }
         try:
             await ws.send_json(snapshot)

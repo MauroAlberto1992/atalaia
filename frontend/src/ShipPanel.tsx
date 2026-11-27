@@ -54,6 +54,13 @@ export function ShipPanel() {
     ? [
         ["MMSI", String(track.mmsi)],
         ["AIS class", track.ais_class === "B" ? "B (small craft)" : "A"],
+        [
+          "Source",
+          // Confirmed by the (simulated) sensor in the last 2 minutes.
+          track.sensor_seen && now - Date.parse(track.sensor_seen) < 120_000
+            ? "AIS + sensor (SIMULATED)"
+            : "AIS",
+        ],
         ["Position", `${track.latitude.toFixed(5)}, ${track.longitude.toFixed(5)}`],
         ["Speed", `${track.sog.toFixed(1)} kn`],
         ["Course", track.cog < 360 ? `${track.cog.toFixed(1)}°` : "n/a"],

@@ -2,7 +2,9 @@ import { create } from "zustand";
 import type {
   Alert,
   ConnectionState,
+  DarkTrack,
   HistoryWindow,
+  SensorSweep,
   LiveMessage,
   LngLat,
   RouteResponse,
@@ -19,12 +21,17 @@ export interface TrackState {
   route: LngLat[]; // route of the selected ship only
   alerts: Alert[]; // newest first
   unseen: number; // alerts received live since the user last looked
+  homeRequests: number; // incremented by the "whole area" button; the map frames the area
   focus: LngLat | null; // map flies here when this changes (new array = new request)
   // Phase 14: recorded history for the selected ship.
   window: HistoryWindow; // "live" = in-memory route (as before), else hours from the DB
   dbRoute: RouteResponse | null;
   dbError: string | null; // shown in the panel, e.g. "No database configured"
   historyShip: ShipSeen | null; // selected ship that is no longer on the live map
+  // Phase 15: SIMULATED sensor picture.
+  sensor: SensorSweep | null;
+  dark: DarkTrack[];
+  showDetections: boolean;
 }
 
 // Pure reducer: given a /live message, return the new tracks map.
@@ -34,7 +41,7 @@ export function reduceLive(tracks: Record<number, Track>, msg: LiveMessage): Rec
     // A snapshot replaces everything (also after a reconnect).
     return Object.fromEntries(msg.tracks.map((t) => [t.mmsi, t]));
   }
-  if (msg.type === "alert") return tracks;
+  if (msg.type === "alert" || msg.type === "sensor" || msg.type === "dark") return tracks;
   if (msg.type === "stale") {
     const t = tracks[msg.mmsi];
     return t ? { ...tracks, [msg.mmsi]: { ...t, stale: true } } : tracks;
@@ -69,8 +76,10 @@ interface TrackActions {
   select: (mmsi: number | null) => void;
   focusAlert: (alert: Alert) => void;
   setWindow: (w: HistoryWindow) => void;
+  toggleDetections: () => void;
   selectHistoric: (ship: ShipSeen) => void;
   markSeen: () => void;
+  goHome: () => void;
 }
 
 export const useTrackStore = create<TrackState & TrackActions>()((set, get) => ({
@@ -81,24 +90,37 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
   alerts: [],
   unseen: 0,
   focus: null,
+  homeRequests: 0,
   window: "live",
   dbRoute: null,
   dbError: null,
   historyShip: null,
+  sensor: null,
+  dark: [],
+  showDetections: false,
 
   applyLive: (msg) =>
     set((s) => {
       const tracks = reduceLive(s.tracks, msg);
+      const sensorPart =
+        msg.type === "snapshot"
+          ? { sensor: msg.sensor ?? null, dark: msg.dark ?? [] }
+          : msg.type === "sensor"
+            ? { sensor: msg.sweep }
+            : msg.type === "dark"
+              ? { dark: msg.tracks }
+              : {};
       const alerts = reduceAlerts(s.alerts, msg);
       const unseen = msg.type === "alert" ? s.unseen + 1 : s.unseen;
       // The selected ship may be gone (removed, or missing from a new snapshot).
       // A ship picked from the recorded history is meant to be off the live map.
       if (s.selected !== null && !(s.selected in tracks) && s.historyShip === null)
-        return { tracks, alerts, unseen, selected: null, route: [] };
+        return { tracks, alerts, unseen, ...sensorPart, selected: null, route: [] };
       return {
         tracks,
         alerts,
         unseen,
+        ...sensorPart,
         route:
           msg.type === "track" && msg.track.mmsi === s.selected ? appendRoute(s.route, msg.track) : s.route,
       };
@@ -108,9 +130,15 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
 
   markSeen: () => set({ unseen: 0 }),
 
+  toggleDetections: () => set((s) => ({ showDetections: !s.showDetections })),
+
   focusAlert: (alert) => {
     const t = get().tracks[alert.mmsi];
-    if (!t) return; // ship already removed: nothing to show
+    if (!t) {
+      // No AIS ship (e.g. a dark vessel): fly to where the alert happened.
+      if (alert.lat != null && alert.lon != null) set({ focus: [alert.lon, alert.lat] });
+      return;
+    }
     get().select(alert.mmsi);
     set({ focus: [t.longitude, t.latitude] });
   },
@@ -160,4 +188,5 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
       })
       .catch(() => {}); // no history: the route just starts from live updates
   },
+  goHome: () => set((s) => ({ homeRequests: s.homeRequests + 1 })),
 }));

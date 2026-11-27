@@ -72,4 +72,39 @@ export const chevronIcon = () =>
     ctx.stroke();
   });
 
+// Dark vessel (sensor contact with no AIS): red diamond. Grey: a contact a
+// recently seen AIS ship could explain ("possible AIS").
+export const darkIcon = (fill = "#ef4444", stroke = "#fecaca") =>
+  draw((ctx, s) => {
+    ctx.beginPath();
+    ctx.moveTo(s / 2, s / 2 - 8);
+    ctx.lineTo(s / 2 + 7, s / 2);
+    ctx.lineTo(s / 2, s / 2 + 8);
+    ctx.lineTo(s / 2 - 7, s / 2);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1.5;
+    ctx.fill();
+    ctx.stroke();
+  });
+
+// The (SIMULATED) patrol drone: white cross in a ring.
+export const droneIcon = () =>
+  draw((ctx, s) => {
+    const c = s / 2;
+    ctx.strokeStyle = "#0c1220";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(c - 8, c); ctx.lineTo(c + 8, c); ctx.moveTo(c, c - 8); ctx.lineTo(c, c + 8);
+    ctx.stroke();
+    ctx.strokeStyle = "#f8fafc";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(c, c, 4, 0, Math.PI * 2);
+    ctx.fillStyle = "#f8fafc";
+    ctx.fill();
+  });
+
 export const ICON_PIXEL_RATIO = RATIO;
