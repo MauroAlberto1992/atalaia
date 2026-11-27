@@ -189,3 +189,16 @@ def test_simulated_sensor_is_off_by_default():
         assert app.state.runtime.sensor is None
         with client.websocket_connect("/live") as ws:
             assert ws.receive_json()["dark"] == []
+
+
+def test_demo_overrides_speed_up_only_the_drone():
+    from minicop.api import apply_demo_overrides
+    from minicop.sensors import load_sensors_config
+
+    cfg = load_sensors_config()
+    assert apply_demo_overrides(cfg, {}) is cfg
+    fast = apply_demo_overrides(
+        cfg, {"MINICOP_SENSOR_SWEEP_S": "1", "MINICOP_DRONE_SPEED_KN": "600"}
+    )
+    assert fast.drone.sweep_s == 1 and fast.drone.speed_kn == 600
+    assert fast.dark_targets == cfg.dark_targets  # dark targets keep their real speed

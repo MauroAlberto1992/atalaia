@@ -7,7 +7,7 @@ import asyncio
 import contextlib
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import cast
@@ -220,6 +220,22 @@ class Runtime:
     area: Area | None
 
 
+def apply_demo_overrides(cfg: SensorsConfig, env: Mapping[str, str]) -> SensorsConfig:
+    """Optional overrides to watch the simulation without waiting:
+    MINICOP_SENSOR_SWEEP_S (seconds between sweeps, config: 30) and
+    MINICOP_DRONE_SPEED_KN (config: 60 kn, one patrol loop in ~77 min).
+    Only the drone is sped up; the scripted dark targets keep their real speed,
+    so the fusion's plausible-speed check still applies to them."""
+    drone: dict[str, float] = {}
+    if env.get("MINICOP_SENSOR_SWEEP_S", "").strip():
+        drone["sweep_s"] = float(env["MINICOP_SENSOR_SWEEP_S"])
+    if env.get("MINICOP_DRONE_SPEED_KN", "").strip():
+        drone["speed_kn"] = float(env["MINICOP_DRONE_SPEED_KN"])
+    if not drone:
+        return cfg
+    return cfg.model_copy(update={"drone": cfg.drone.model_copy(update=drone)})
+
+
 def _simulated_sensor(enabled: bool | None, cfg: SensorsConfig | None) -> SimulatedSensor | None:
     """The simulated sensor is OFF unless asked for (MINICOP_SIMULATED_SENSOR=1),
     so simulated contacts are never mixed into a picture by accident."""
@@ -227,7 +243,7 @@ def _simulated_sensor(enabled: bool | None, cfg: SensorsConfig | None) -> Simula
         enabled = os.getenv("MINICOP_SIMULATED_SENSOR", "0").strip() == "1"
     if not enabled:
         return None
-    cfg = cfg or load_sensors_config()
+    cfg = apply_demo_overrides(cfg or load_sensors_config(), os.environ)
     return SimulatedSensor(
         sim=DroneSimulator(cfg, start=datetime.now(UTC)),
         fusion=FusionEngine(cfg.fusion),

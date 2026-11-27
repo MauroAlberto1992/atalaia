@@ -26,6 +26,9 @@ services:
       # SIMULATED patrol-drone sensor + AIS fusion (phase 15). Clearly labelled
       # in the UI. Set to 0 in .env (MINICOP_SIMULATED_SENSOR=0) to turn it off.
       MINICOP_SIMULATED_SENSOR: ${MINICOP_SIMULATED_SENSOR:-1}
+      # Optional, to watch the demo faster: seconds between sweeps, drone speed (kn).
+      MINICOP_SENSOR_SWEEP_S: ${MINICOP_SENSOR_SWEEP_S:-}
+      MINICOP_DRONE_SPEED_KN: ${MINICOP_DRONE_SPEED_KN:-}
     depends_on:
       db:
         condition: service_healthy
