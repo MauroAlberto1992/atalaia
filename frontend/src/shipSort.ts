@@ -10,14 +10,17 @@ export const SHIP_SORTS: { value: ShipSort; label: string }[] = [
 
 // Pure: returns a new array, never mutates the input.
 // - recent: last seen first;
-// - live: ships on the live map first, then the rest; most recent first within each;
+// - live: ships on the live map first, then the rest; within each group, most
+//   points first (ties: most recent first), as the developer asked;
 // - points: most recorded points first (ties: most recent first).
 export function sortShips(ships: ShipSeen[], sort: ShipSort, isLive: (mmsi: number) => boolean): ShipSeen[] {
   const byRecent = (a: ShipSeen, b: ShipSeen) => Date.parse(b.last_seen) - Date.parse(a.last_seen);
   const sorted = [...ships];
   if (sort === "recent") return sorted.sort(byRecent);
   if (sort === "points") return sorted.sort((a, b) => b.points - a.points || byRecent(a, b));
-  return sorted.sort((a, b) => Number(isLive(b.mmsi)) - Number(isLive(a.mmsi)) || byRecent(a, b));
+  return sorted.sort(
+    (a, b) => Number(isLive(b.mmsi)) - Number(isLive(a.mmsi)) || b.points - a.points || byRecent(a, b),
+  );
 }
 
 // Remembered per browser; storage may be unavailable (private mode).

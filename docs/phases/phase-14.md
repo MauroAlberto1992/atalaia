@@ -32,7 +32,7 @@ On the developer's data, a Barreiro–Terreiro do Paço ferry went back and fort
 - **Verified in the browser** against the real backend and database, with an out-and-back route: the chevrons point north on the way out and south on the way back.
 
 ## Addendum: sorting the recent ships list (requested)
-- **Three sort options** in "Recent ships": **Recent** (last seen first, the default), **Live first** (ships on the live map first, then by recency) and **Points** (most recorded points first, ties by recency).
+- **Three sort options** in "Recent ships": **Recent** (last seen first, the default), **Live first** (ships on the live map first; within each group most points first, ties by recency) and **Points** (most recorded points first, ties by recency).
 - The choice is remembered in `localStorage`, guarded so it falls back to "Recent".
 - `shipSort.ts` is pure: it never mutates its input, and it has 4 tests.
 - **Verified in the browser** against the real backend and database: every order is correct, and the choice survives a reload.

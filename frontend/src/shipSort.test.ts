@@ -17,8 +17,14 @@ describe("sortShips", () => {
     expect(order(sortShips(SHIPS, "recent", live))).toEqual([1, 4, 3, 2]);
   });
 
-  it("live first, then recent within each group", () => {
-    expect(order(sortShips(SHIPS, "live", live))).toEqual([1, 3, 4, 2]);
+  it("live first, then most points within each group", () => {
+    // live: 3 (50 pts) before 1 (10 pts); not live: 2 (500) before 4 (50)
+    expect(order(sortShips(SHIPS, "live", live))).toEqual([3, 1, 2, 4]);
+  });
+
+  it("live first: equal points fall back to most recent", () => {
+    const tie = [ship(5, 10, 20), ship(6, 1, 20)];
+    expect(order(sortShips(tie, "live", () => true))).toEqual([6, 5]);
   });
 
   it("points: most first, ties broken by recency", () => {
