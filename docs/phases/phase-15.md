@@ -43,6 +43,19 @@ Before a confirmed contact is reported dark, every AIS ship seen in the last 60 
 
 **The cost is real:** in the sparse scenario DARK-2 (3 kn, loitering among ships) was explained for a whole drone pass, at one point by a ship whose AIS was only 2.4 min old, and was only reported on the drone's next pass, 146 min later. Close to AIS ships, a dark vessel cannot be told apart from them with this rule. Tried and measured: excluding ships the sensor matched elsewhere in the same sweep. It did not help DARK-2 and raised AIS ships reported dark from 4 to 5 (10 in a cruder version), so it was reverted.
 
+### After moving the dark targets next to the drone's route
+Tested on the developer's Mac, the dark targets were rarely seen: the drone flies the perimeter of its patrol box and they sailed in the middle, inside the footprint only 9% (DARK-1) and 6% (DARK-2) of the time. They now sail ~2 nm inside the north leg and loiter near the south-east corner: 13% and 18%, i.e. seen on every loop. Same evaluation, new paths:
+
+| Scenario | Dark targets | Time to confirm | False dark (clutter) | AIS ships reported dark | Explained by recent AIS |
+|---|---|---|---|---|---|
+| Default | 2/2 | 1.0 / 1.0 min | 0 | 0 | 1 dark contact, briefly |
+| Harder | 2/2 | 1.0 / 2.5 min | 1 | 0 | 1 dark contact, briefly |
+| Sparse AIS | 2/2 | 1.0 / 1.0 min | 0 | **6** (39 without the check) | 37 right MMSI, 2 wrong MMSI, **5 dark contacts** |
+
+The earlier 147-minute delay for DARK-2 depended on its old path among the synthetic ships; the risk itself (a dark target near AIS ships is "explained") remains: 5 dark contacts were explained at some point.
+
+Demo speed: `MINICOP_SENSOR_SWEEP_S=1` and `MINICOP_DRONE_SPEED_KN=600` in `.env` give one patrol loop in ~8 min (drone only; dark targets keep their real speed).
+
 ### Weaknesses (stated, not hidden)
 1. **Sparse AIS was the big one** (now mitigated, see above; the cost is a dark vessel hiding next to AIS ships). AIS tracks older than 10 minutes are not used for association, so a real ship whose last report is 10–15 minutes old looks like a non-cooperative contact: **38 false dark alerts in 6 hours**. The real feed measured in phase 12 averages about 2 minutes between reports per ship, with longer silences, so this would happen in practice. Fix candidates:
    - before declaring "dark", check older AIS tracks with a gate that grows with possible travel;
@@ -73,6 +86,7 @@ Before a confirmed contact is reported dark, every AIS ship seen in the last 60 
 | **Diagnosed a design flaw without measuring it.** When the clutter test failed, the agent blamed old candidates with a growing radius, added a "confirmation window" check, and told the developer it was "a real design flaw". Measured afterwards with and without the check: **1 false confirmation in both**. The failure was a genuine chance coincidence of 3 clutter points. | Measuring both variants in memory. The first attempt to measure "before" was itself invalid: `git stash` doesn't stash new untracked files, so it measured the fixed code. | The check stays, with an honest comment (it keeps stale candidates from taking new contacts' detections), and the test now bounds the false-alarm rate instead of demanding zero. The developer was told the earlier claim was wrong. |
 | The speed shown for a fresh dark contact (16 kn for a 6 kn target) came from too short a span. | The browser screenshot. | No speed until the detections span 3 minutes. |
 | The first "exclude ships seen elsewhere" variant was expected to help; it made things worse (4 → 10 AIS ships reported dark). | Running the evaluation after each change. | Reverted; the result is recorded above instead of tuning until the numbers looked good. |
+| The scripted dark targets were placed inside the patrol box, where the perimeter-flying drone rarely sees them (9% / 6% of the time). | The developer, waiting in the live demo. | Measured, then moved next to the drone's route (13% / 18%). |
 | Two scripted edits failed on text that `ruff format` had already reflowed, and one put a constant above the imports. | ruff (E402) and the edit script's own assertion. | Re-read the current text before scripted edits. |
 
 ## How to run

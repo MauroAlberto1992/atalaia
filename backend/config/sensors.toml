@@ -19,13 +19,13 @@ patrol = [[36.95, -8.75], [36.95, -8.20], [36.75, -8.20], [36.75, -8.75]]
 name = "DARK-1"
 speed_kn = 6
 loop = true
-path = [[36.80, -8.70], [36.92, -8.45], [36.80, -8.25]]
+path = [[36.93, -8.70], [36.92, -8.45], [36.93, -8.25]]  # along the drone's north leg, ~2 nm inside it
 
 [[dark_targets]]
 name = "DARK-2"
 speed_kn = 3
 loop = true
-path = [[36.88, -8.30], [36.86, -8.32], [36.84, -8.29], [36.87, -8.27]]
+path = [[36.78, -8.24], [36.76, -8.27], [36.77, -8.30], [36.79, -8.26]]  # loitering near the south-east corner
 
 [fusion]
 track_max_age_min = 10    # AIS tracks older than this are not used for association
