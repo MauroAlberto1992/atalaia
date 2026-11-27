@@ -1,6 +1,12 @@
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
 import type { FeatureCollection } from "geojson";
-import { MapLibreMap, setWorkerUrl, type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
+import {
+  MapLibreMap,
+  Popup,
+  setWorkerUrl,
+  type GeoJSONSource,
+  type MapLayerMouseEvent,
+} from "maplibre-gl";
 // MapLibre 6 loads its web worker from a file next to its own module. The dev
 // server serves it from node_modules, but `vite build` does not copy it, so in
 // production the request fell through to index.html and no map was drawn.
@@ -8,7 +14,8 @@ import { MapLibreMap, setWorkerUrl, type GeoJSONSource, type MapLayerMouseEvent 
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
-import { ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
+import { routeBounds, routeToGeo } from "./routeGeo";
+import { chevronIcon, ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
 import { useTrackStore } from "./store";
 import type { LngLat, Track, Zone } from "./types";
 
@@ -149,6 +156,50 @@ export function MapView() {
         layout: { "line-join": "round", "line-cap": "round" },
         paint: { "line-color": "#facc15", "line-width": 2, "line-opacity": 0.8 },
       });
+      // Recorded route from the database (phase 14): segments, gaps, points.
+      const emptyGeo = routeToGeo(null);
+      map.addSource("db-segments", { type: "geojson", data: emptyGeo.segments });
+      map.addSource("db-gaps", { type: "geojson", data: emptyGeo.gaps });
+      map.addSource("db-points", { type: "geojson", data: emptyGeo.points });
+      map.addLayer({
+        id: "db-gaps", type: "line", source: "db-gaps",
+        // A gap is not a track: faint and dashed, never a confident line.
+        paint: { "line-color": "#facc15", "line-width": 1.5, "line-opacity": 0.4, "line-dasharray": [2, 3] },
+      });
+      map.addLayer({
+        id: "db-segments", type: "line", source: "db-segments",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#facc15", "line-width": 2, "line-opacity": 0.85 },
+      });
+      // Each received report: a chevron pointing the way the ship went next;
+      // a lone report (no neighbour, no direction) stays a dot.
+      map.addImage("route-chevron", chevronIcon(), { pixelRatio: ICON_PIXEL_RATIO });
+      map.addLayer({
+        id: "db-points", type: "symbol", source: "db-points",
+        filter: ["!", ["get", "single"]],
+        layout: {
+          "icon-image": "route-chevron",
+          "icon-rotate": ["get", "bearing"],
+          "icon-rotation-alignment": "map", // relative to north, like ship arrows
+          "icon-allow-overlap": true,
+          "icon-size": 0.8,
+        },
+      });
+      map.addLayer({
+        id: "db-points-single", type: "circle", source: "db-points",
+        filter: ["get", "single"],
+        paint: { "circle-radius": 2.5, "circle-color": "#facc15", "circle-stroke-color": "#0c1220", "circle-stroke-width": 1 },
+      });
+      // Hovering a gap says how long there was no data.
+      const gapPopup = new Popup({ closeButton: false, closeOnClick: false });
+      map.on("mousemove", "db-gaps", (e: MapLayerMouseEvent) => {
+        const minutes = e.features?.[0]?.properties.minutes as number | undefined;
+        if (minutes === undefined) return;
+        const text = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
+        gapPopup.setLngLat(e.lngLat).setText(`No data for ${text}`).addTo(map);
+      });
+      map.on("mouseleave", "db-gaps", () => gapPopup.remove());
+
       map.addLayer({
         id: "selected-ring",
         type: "circle",
@@ -182,8 +233,9 @@ export function MapView() {
       // Push store changes into the map. subscribe() runs outside React's
       // render cycle: the map is updated directly, nothing re-renders.
       let lastFocus: LngLat | null = null;
+      let lastDbRoute: unknown = null;
       const sync = () => {
-        const { tracks, selected, route, focus } = useTrackStore.getState();
+        const { tracks, selected, route, focus, window, dbRoute } = useTrackStore.getState();
         if (focus && focus !== lastFocus) {
           // Same reference = same request; a click on an alert creates a new array.
           lastFocus = focus;
@@ -191,7 +243,19 @@ export function MapView() {
         }
         // setData returns a promise in MapLibre 6; we don't need to wait for it.
         void (map.getSource("ships") as GeoJSONSource).setData(toGeoJSON(tracks));
-        void (map.getSource("route") as GeoJSONSource).setData(routeGeoJSON(route));
+        // Live route only in "live" mode; a recorded window replaces it.
+        void (map.getSource("route") as GeoJSONSource).setData(
+          routeGeoJSON(window === "live" ? route : []),
+        );
+        if (dbRoute !== lastDbRoute) {
+          lastDbRoute = dbRoute;
+          const geo = routeToGeo(dbRoute);
+          void (map.getSource("db-segments") as GeoJSONSource).setData(geo.segments);
+          void (map.getSource("db-gaps") as GeoJSONSource).setData(geo.gaps);
+          void (map.getSource("db-points") as GeoJSONSource).setData(geo.points);
+          const bounds = dbRoute ? routeBounds(dbRoute) : null;
+          if (bounds) map.fitBounds(bounds, { padding: 80, maxZoom: 13 });
+        }
         map.setFilter("selected-ring", ["==", ["get", "mmsi"], selected ?? -1]);
       };
       sync();

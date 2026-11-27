@@ -30,7 +30,8 @@ One always-on process, event-driven internally (asyncio queues, no broker):
    PostgreSQL + TimescaleDB + PostGIS (`db` service; migrations in `backend/migrations`).
    Never blocks the live path; optional (off without `DATABASE_URL`).
 3. API: `GET /tracks` (current snapshot) and `WS /live` (real-time changes),
-   plus `/tracks/{mmsi}/history`, `/zones`, `/alerts`, `/area`, `/health`.
+   plus `/tracks/{mmsi}/history`, `/tracks/{mmsi}/route`, `/ships`, `/zones`, `/alerts`,
+   `/area`, `/health`.
 The browser never connects to aisstream directly.
 
 ## aisstream gotchas
@@ -88,7 +89,8 @@ Keep company names out of user-facing text (README, UI); they live here only.
 11. Real port list from OpenStreetMap (config/ports.json, 359 ports, ODbL).
 12. Record every position in TimescaleDB/PostGIS.
 13. Class B vessels (small craft): messages 18/19, ais_class everywhere, smaller icon.
-Next: 14 routes from the DB, 15 user-drawn areas.
+14. Routes from the database: window 1 h-7 d, segments split at gaps, honest drawing, recent ships.
+Next: 15 user-drawn areas (or sensor fusion first, see README priorities).
 
 ## Layout
 ```

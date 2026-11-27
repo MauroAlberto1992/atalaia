@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { AlertPanel } from "./AlertPanel";
 import { connectLive } from "./live";
 import { MapView } from "./MapView";
+import { RecentShips } from "./RecentShips";
 import { ShipPanel } from "./ShipPanel";
 import { StatusBar } from "./StatusBar";
 
@@ -13,6 +14,7 @@ export function App() {
       <StatusBar />
       <ShipPanel />
       <AlertPanel />
+      <RecentShips />
     </>
   );
 }

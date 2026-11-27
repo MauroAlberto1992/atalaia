@@ -54,4 +54,22 @@ export const stoppedIcon = (stale = false, classB = false) =>
     ctx.stroke();
   });
 
+// Chevron (">" turned to point north) for recorded route points: shows the
+// direction of travel. Rotated by the bearing to the next report.
+export const chevronIcon = () =>
+  draw((ctx, s) => {
+    ctx.beginPath();
+    ctx.moveTo(s / 2 - 6, s / 2 + 4);
+    ctx.lineTo(s / 2, s / 2 - 4);
+    ctx.lineTo(s / 2 + 6, s / 2 + 4);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = STROKE; // dark outline first, for contrast on any basemap
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.strokeStyle = "#facc15"; // route yellow
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  });
+
 export const ICON_PIXEL_RATIO = RATIO;

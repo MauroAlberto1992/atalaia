@@ -131,3 +131,51 @@ def test_recorder_writes_positions_and_ships():
             await conn.close()
 
     run(body())
+
+
+def test_route_and_ships_queries():
+    """Read side (phase 14): positions written as the recorder would."""
+    from minicop.history_db import HistoryDB
+
+    async def body():
+        conn = await fresh_connection()
+        await migrate(conn)
+        now = datetime.now(UTC)
+        rows = [
+            (now - timedelta(minutes=m), 263000001, 37.0 + m * 0.001, -8.5, 6.0, 0.0, 511, 0, "A")
+            for m in (50, 40, 30)
+        ] + [(now - timedelta(minutes=10), 263000002, 38.0, -9.0, 3.0, 90.0, 511, 15, "B")]
+        await conn.copy_records_to_table(
+            "positions",
+            records=rows,
+            columns=[
+                "time",
+                "mmsi",
+                "lat",
+                "lon",
+                "sog",
+                "cog",
+                "true_heading",
+                "nav_status",
+                "ais_class",
+            ],
+        )
+        await conn.execute(
+            "INSERT INTO ships VALUES (263000001, 'OLD SHIP', $1, $1)", now - timedelta(hours=1)
+        )
+        db = HistoryDB(DSN)
+        try:
+            route = await db.route(263000001, now - timedelta(hours=1))
+            # oldest first: 50, 40, 30 minutes ago -> lat 37.05, 37.04, 37.03
+            assert [round(p.lat, 3) for p in route] == [37.05, 37.04, 37.03]
+            assert all(a.time < b.time for a, b in zip(route, route[1:], strict=False))
+            assert await db.route(263000001, now - timedelta(minutes=35)) != route  # window
+            ships = await db.ships(now - timedelta(hours=1))
+            assert [s.mmsi for s in ships] == [263000002, 263000001]  # last seen first
+            assert ships[1].name == "OLD SHIP" and ships[1].points == 3
+            assert ships[0].ais_class == "B" and ships[0].name == ""
+        finally:
+            await db.close()
+            await conn.close()
+
+    run(body())

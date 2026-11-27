@@ -149,3 +149,10 @@ def test_health_reports_pipeline_counters():
         assert health["positions_accepted"] == 1
         assert health["rejected_out_of_order"] == 1
         assert health["frames_received"] == 0  # no aisstream in tests
+
+
+def test_route_and_ships_need_a_database():
+    with TestClient(create_app(ingest=False)) as client:
+        assert client.get("/tracks/1/route").status_code == 503
+        assert client.get("/ships").status_code == 503
+        assert client.get("/tracks/1/route?hours=500").status_code == 422  # max 7 days

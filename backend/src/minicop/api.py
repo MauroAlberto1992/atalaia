@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+import asyncpg
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from minicop.alerts import Alert, AlertEngine
@@ -21,10 +22,12 @@ from minicop.config import Area, load_settings
 from minicop.coverage import CoverageConfig, CoverageMonitor, load_coverage_config
 from minicop.events import PositionEvent, Tick, Track
 from minicop.history import HistoryPoint, HistoryStats
+from minicop.history_db import HistoryDB, ShipSeen, window_start
 from minicop.hub import Hub
 from minicop.ingest import IngestStatus, run_ingestion
 from minicop.ports import load_ports
 from minicop.recorder import Recorder
+from minicop.routes import MAX_POINTS, RoutePoint, RouteStats, route_stats, split_segments, thin
 from minicop.state import TrackStore
 from minicop.zones import Zone, load_zones
 
@@ -35,6 +38,14 @@ SWEEP_INTERVAL_S = 30
 
 # Positions from ingestion and clock ticks share one queue (single writer).
 EventQueue = asyncio.Queue[PositionEvent | Tick]
+
+
+class RouteResponse(BaseModel):
+    mmsi: int
+    hours: int
+    thinned: bool  # True if more than MAX_POINTS points were evenly thinned
+    segments: list[list[RoutePoint]]  # split where points are > 30 min apart
+    stats: RouteStats
 
 
 class HistoryResponse(BaseModel):
@@ -129,8 +140,14 @@ class Runtime:
     anomalies: AnomalyDetector
     coverage: CoverageMonitor
     recorder: Recorder | None  # None when DATABASE_URL is not set
+    history_db: HistoryDB | None  # read side of the recorded history (phase 14)
     status: IngestStatus
     area: Area | None
+
+
+def _history_db_from_env() -> HistoryDB | None:
+    dsn = os.getenv("DATABASE_URL", "").strip()
+    return HistoryDB(dsn) if dsn else None
 
 
 def _recorder_from_env() -> Recorder | None:
@@ -179,6 +196,7 @@ def create_app(
             anomalies=AnomalyDetector(anomaly_cfg, zone_list, alert_engine),
             coverage=CoverageMonitor(coverage_cfg, alert_engine),
             recorder=_recorder_from_env(),
+            history_db=_history_db_from_env(),
             status=IngestStatus(),
             area=settings.area if settings else None,
         )
@@ -199,6 +217,8 @@ def create_app(
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        if rt.history_db is not None:
+            await rt.history_db.close()
 
     app = FastAPI(title="Mini-COP", lifespan=lifespan)
 
@@ -243,6 +263,37 @@ def create_app(
     @app.get("/tracks")
     async def tracks() -> list[Track]:
         return runtime().store.snapshot()
+
+    def history_db() -> HistoryDB:
+        db = runtime().history_db
+        if db is None:
+            raise HTTPException(503, "No database configured (DATABASE_URL); live history only")
+        return db
+
+    @app.get("/tracks/{mmsi}/route")
+    async def route(mmsi: int, hours: int = Query(24, ge=1, le=168)) -> RouteResponse:
+        """Recorded route of one ship over the last `hours`, split at gaps."""
+        try:
+            points = await history_db().route(mmsi, window_start(datetime.now(UTC), hours))
+        except (OSError, asyncpg.PostgresError) as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}") from exc
+        points, thinned = thin(points, MAX_POINTS)
+        segments = split_segments(points)
+        return RouteResponse(
+            mmsi=mmsi,
+            hours=hours,
+            thinned=thinned,
+            segments=segments,
+            stats=route_stats(segments),
+        )
+
+    @app.get("/ships")
+    async def ships(hours: int = Query(24, ge=1, le=168)) -> list[ShipSeen]:
+        """Ships recorded in the last `hours`, including ones no longer live."""
+        try:
+            return await history_db().ships(window_start(datetime.now(UTC), hours))
+        except (OSError, asyncpg.PostgresError) as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}") from exc
 
     @app.get("/tracks/{mmsi}/history")
     async def history(mmsi: int) -> HistoryResponse:
