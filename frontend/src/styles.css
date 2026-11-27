@@ -83,8 +83,12 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 .note.error { color: #f87171; }
 
-.recent {
+.left-stack {
   position: absolute; top: 60px; left: 12px; width: 280px; max-width: calc(100% - 24px);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+}
+.recent {
+  width: 100%;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 12px;
 }
 .recent-toggle {
@@ -106,7 +110,7 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .dot.class-B { background: #4ade80; }
 
 @media (max-width: 600px) {
-  .recent { top: 56px; width: auto; right: 12px; }
+  .left-stack { top: 56px; width: auto; right: 12px; }
   .alerts { bottom: auto; top: 56px; max-height: 25vh; }
   .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; }
 }
@@ -130,5 +134,9 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
   border-radius: 4px; padding: 2px 8px; font: inherit; cursor: pointer;
 }
 
-/* "Back to the whole area" map button. */
-.maplibregl-ctrl-group button.home-button { font-size: 18px; line-height: 1; color: #0f172a; }
+/* "Whole area" button, under the recent ships list. */
+.home-button {
+  padding: 5px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
+}
+.home-button:hover { background: #1e293b; }

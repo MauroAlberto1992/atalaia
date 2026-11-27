@@ -21,6 +21,7 @@ export interface TrackState {
   route: LngLat[]; // route of the selected ship only
   alerts: Alert[]; // newest first
   unseen: number; // alerts received live since the user last looked
+  homeRequests: number; // incremented by the "whole area" button; the map frames the area
   focus: LngLat | null; // map flies here when this changes (new array = new request)
   // Phase 14: recorded history for the selected ship.
   window: HistoryWindow; // "live" = in-memory route (as before), else hours from the DB
@@ -78,6 +79,7 @@ interface TrackActions {
   toggleDetections: () => void;
   selectHistoric: (ship: ShipSeen) => void;
   markSeen: () => void;
+  goHome: () => void;
 }
 
 export const useTrackStore = create<TrackState & TrackActions>()((set, get) => ({
@@ -88,6 +90,7 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
   alerts: [],
   unseen: 0,
   focus: null,
+  homeRequests: 0,
   window: "live",
   dbRoute: null,
   dbError: null,
@@ -185,4 +188,5 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
       })
       .catch(() => {}); // no history: the route just starts from live updates
   },
+  goHome: () => set((s) => ({ homeRequests: s.homeRequests + 1 })),
 }));

@@ -130,30 +130,8 @@ export function MapView() {
     });
     mapRef.current = map;
 
-    // "Home" button: back to the configured area (the start view).
+    // Framed by the "whole area" button (store.goHome) and at start.
     let home: [[number, number], [number, number]] | null = null;
-    map.addControl(
-      {
-        onAdd: () => {
-          const box = document.createElement("div");
-          box.className = "maplibregl-ctrl maplibregl-ctrl-group";
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "home-button";
-          btn.title = "Back to the whole area";
-          btn.setAttribute("aria-label", "Back to the whole area");
-          btn.textContent = "⌂";
-          btn.onclick = () => {
-            if (home) map.fitBounds(home, { padding: 20 });
-            else map.jumpTo({ center: [-8.0, 38.5], zoom: 6 });
-          };
-          box.append(btn);
-          return box;
-        },
-        onRemove: () => {},
-      },
-      "top-right",
-    );
 
     fetch("/api/area")
       .then((r) => r.json())
@@ -322,12 +300,17 @@ export function MapView() {
       // Push store changes into the map. subscribe() runs outside React's
       // render cycle: the map is updated directly, nothing re-renders.
       let lastFocus: LngLat | null = null;
+      let lastHome = useTrackStore.getState().homeRequests;
       let lastDbRoute: unknown = null;
       let lastSensor: unknown = null;
       let lastDark: unknown = null;
       const sync = () => {
-        const { tracks, selected, route, focus, window, dbRoute, sensor, dark, showDetections } =
+        const { tracks, selected, route, focus, window, dbRoute, sensor, dark, showDetections, homeRequests } =
           useTrackStore.getState();
+        if (homeRequests !== lastHome) {
+          lastHome = homeRequests;
+          if (home) map.fitBounds(home, { padding: 20 });
+        }
         if (sensor !== lastSensor || dark !== lastDark) {
           lastSensor = sensor;
           lastDark = dark;

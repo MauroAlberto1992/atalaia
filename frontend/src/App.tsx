@@ -5,6 +5,7 @@ import { MapView } from "./MapView";
 import { RecentShips } from "./RecentShips";
 import { ShipPanel } from "./ShipPanel";
 import { StatusBar } from "./StatusBar";
+import { useTrackStore } from "./store";
 
 export function App() {
   useEffect(() => connectLive(), []); // returns the cleanup that closes the socket
@@ -14,7 +15,12 @@ export function App() {
       <StatusBar />
       <ShipPanel />
       <AlertPanel />
-      <RecentShips />
+      <div className="left-stack">
+        <RecentShips />
+        <button className="home-button" onClick={() => useTrackStore.getState().goHome()}>
+          ⌂ Whole area
+        </button>
+      </div>
     </>
   );
 }
