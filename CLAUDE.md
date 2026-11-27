@@ -132,3 +132,5 @@ Status: v1 complete (phases 0-6); phase 7 adds guardrails and the AI workflow do
 - `git stash` does not stash new untracked files: to compare before/after for a new file, patch in memory.
 - A probabilistic rule (M-of-N) has a non-zero false-alarm rate: test that it is bounded, not zero.
 - Keep test data clearly on one side of a threshold (e.g. chord vs arc made 4 kn fall just under 2 nm).
+- A demo/speed option is verified by its end result (contacts confirmed), not only by its inputs (drone moving).
+- In a simulated scenario, measure that the sensor actually sees the targets before handing it over.

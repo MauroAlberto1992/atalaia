@@ -233,13 +233,14 @@ class FusionEngine:
         hits = [s for s in c.hit_sweeps if s >= window_start]
         if len(hits) < self.cfg.confirm_hits:
             return False
-        # Plausibility: no hop between consecutive detections faster than a ship.
+        # Plausibility: no hop between consecutive detections longer than a ship
+        # could travel, plus what position noise alone can add (3 sigma of the
+        # difference of two noisy fixes). Without the noise term, sweeps 1 s
+        # apart never confirmed anything: 150 m of noise in 1 s reads ~300 kn.
         for p, q in zip(c.points, c.points[1:], strict=False):
             hours = (q.time - p.time).total_seconds() / 3600
-            if (
-                hours > 0
-                and haversine_nm(p.lat, p.lon, q.lat, q.lon) / hours > self.cfg.max_speed_kn
-            ):
+            noise_nm = 3 * math.sqrt(p.sigma_m**2 + q.sigma_m**2) / 1852
+            if haversine_nm(p.lat, p.lon, q.lat, q.lon) > self.cfg.max_speed_kn * hours + noise_nm:
                 return False
         return True
 

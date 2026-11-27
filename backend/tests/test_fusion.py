@@ -201,8 +201,9 @@ def test_speed_is_reported_once_detections_span_3_minutes():
 
 def test_implausible_hop_blocks_confirmation():
     eng = FusionEngine(F)
-    # Middle detection 0.34 nm away 30 s later (about 41 kn): not a ship.
-    for k, pos in enumerate([SEA, east(*SEA, 0.34), SEA]):
+    # Middle detection 1 nm away 30 s later (120 kn): not a ship, and well
+    # beyond what 150 m position noise can add (3 sigma ~ 0.34 nm).
+    for k, pos in enumerate([SEA, east(*SEA, 1.0), SEA]):
         t = T0 + timedelta(seconds=30 * k)
         out = eng.process(sweep(t, [det(*pos, t)]), tracks=[])
         assert out.newly_confirmed == []
@@ -257,3 +258,17 @@ def test_contact_no_ais_ship_can_reach_is_dark_and_alerts_once():
     outs = run_contact([ship])
     assert sum(len(o.newly_confirmed) for o in outs) == 1
     assert outs[-1].dark[0].possible_mmsi is None
+
+
+def test_one_second_sweeps_confirm_despite_position_noise():
+    """Regression: with sweeps 1 s apart, 150 m noise read as ~300 kn and the
+    plausibility check blocked every confirmation (seen in the fast demo)."""
+    rng = random.Random(3)
+    eng = FusionEngine(F)
+    confirmed = False
+    for k in range(10):  # a stopped target, noisy fixes, 1 s apart
+        t = T0 + timedelta(seconds=k)
+        lat = SEA[0] + rng.gauss(0, 150) / 1852 / 60
+        lon = SEA[1] + rng.gauss(0, 150) / 1852 / (60 * math.cos(math.radians(SEA[0])))
+        confirmed |= bool(eng.process(sweep(t, [det(lat, lon, t)]), tracks=[]).newly_confirmed)
+    assert confirmed

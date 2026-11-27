@@ -56,6 +56,9 @@ The earlier 147-minute delay for DARK-2 depended on its old path among the synth
 
 Demo speed: `MINICOP_SENSOR_SWEEP_S=1` and `MINICOP_DRONE_SPEED_KN=600` in `.env` give one patrol loop in ~8 min (drone only; dark targets keep their real speed).
 
+### Position noise in the plausibility check
+In the fast demo (sweeps 1 s apart) no contact was ever confirmed: 150 m of position noise between fixes 1 s apart reads as ~300 kn, so the per-hop speed check rejected everything. Each hop may now be up to `max_speed x time + 3 sigma` of the difference of two noisy fixes. Measured: in 30 min of fast demo, 6 confirmations (every pass of each dark target); 2 sigma kept only 4. Cost: in the harder scenario, clutter false darks went from 1 to 4 in 6 h; the other scenarios are unchanged.
+
 ### Weaknesses (stated, not hidden)
 1. **Sparse AIS was the big one** (now mitigated, see above; the cost is a dark vessel hiding next to AIS ships). AIS tracks older than 10 minutes are not used for association, so a real ship whose last report is 10–15 minutes old looks like a non-cooperative contact: **38 false dark alerts in 6 hours**. The real feed measured in phase 12 averages about 2 minutes between reports per ship, with longer silences, so this would happen in practice. Fix candidates:
    - before declaring "dark", check older AIS tracks with a gate that grows with possible travel;
@@ -87,6 +90,7 @@ Demo speed: `MINICOP_SENSOR_SWEEP_S=1` and `MINICOP_DRONE_SPEED_KN=600` in `.env
 | The speed shown for a fresh dark contact (16 kn for a 6 kn target) came from too short a span. | The browser screenshot. | No speed until the detections span 3 minutes. |
 | The first "exclude ships seen elsewhere" variant was expected to help; it made things worse (4 → 10 AIS ships reported dark). | Running the evaluation after each change. | Reverted; the result is recorded above instead of tuning until the numbers looked good. |
 | The scripted dark targets were placed inside the patrol box, where the perimeter-flying drone rarely sees them (9% / 6% of the time). | The developer, waiting in the live demo. | Measured, then moved next to the drone's route (13% / 18%). |
+| The per-hop speed check ignored position noise, so with 1 s sweeps nothing ever confirmed; the fast-demo option was shipped after checking only that the drone moved. | The developer could not find a single dark contact in the live demo. | Noise term added (3 sigma), regression test that fails on the old rule, fast demo measured end to end. |
 | Two scripted edits failed on text that `ruff format` had already reflowed, and one put a constant above the imports. | ruff (E402) and the edit script's own assertion. | Re-read the current text before scripted edits. |
 
 ## How to run
