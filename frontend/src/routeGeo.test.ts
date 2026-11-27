@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routeBounds, routeToGeo } from "./routeGeo";
+import { bearing, routeBounds, routeToGeo } from "./routeGeo";
 import type { RouteResponse } from "./types";
 
 const p = (minute: number, lat: number) => ({
@@ -44,5 +44,34 @@ describe("routeToGeo", () => {
 describe("routeBounds", () => {
   it("covers all points", () => {
     expect(routeBounds(route)).toEqual([[-8.5, 37.0], [-8.5, 37.09]]);
+  });
+});
+
+describe("direction of travel", () => {
+  it("bearing is clockwise from north", () => {
+    const a = p(0, 37.0);
+    expect(bearing(a, { ...a, lat: 37.1 })).toBeCloseTo(0);
+    expect(bearing(a, { ...a, lon: -8.4 })).toBeCloseTo(90);
+    expect(bearing(a, { ...a, lat: 36.9 })).toBeCloseTo(180);
+    expect(bearing(a, { ...a, lon: -8.6 })).toBeCloseTo(270);
+  });
+
+  it("each point points to the next, the last one keeps the previous direction", () => {
+    const pts = routeToGeo(route).points.features.map((f) => f.properties?.bearing as number);
+    // both segments head north: every chevron ~0 degrees, including segment ends
+    expect(pts.every((b) => b < 1 || b > 359)).toBe(true);
+  });
+
+  it("a ferry going and coming back points both ways", () => {
+    const ferry: RouteResponse = {
+      ...route, segments: [[p(0, 37.0), p(5, 37.05), p(10, 37.0)]],
+    };
+    const b = routeToGeo(ferry).points.features.map((f) => Math.round(f.properties?.bearing as number));
+    expect(b).toEqual([0, 180, 180]);
+  });
+
+  it("a lone report is marked as having no direction", () => {
+    const lone: RouteResponse = { ...route, segments: [[p(0, 37.0)]] };
+    expect(routeToGeo(lone).points.features[0]?.properties?.single).toBe(true);
   });
 });

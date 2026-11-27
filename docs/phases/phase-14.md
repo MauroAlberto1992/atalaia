@@ -24,6 +24,13 @@
   - 6 frontend tests for the route GeoJSON.
   - Totals: 158 backend (4 against the database), 21 frontend.
 
+## Addendum: direction of travel (requested after the live run)
+On the developer's data, a Barreiro–Terreiro do Paço ferry went back and forth, and with plain dots it was impossible to tell which way it was going.
+- **Each recorded point is now a chevron (›) pointing the way the ship went next.** The direction is the bearing to the next report; the last point of a segment uses the bearing from the previous one. A lone report, with no neighbour, stays a dot.
+- **The reported COG is not used**, because it is often "not available" (360) or noise when the ship is slow.
+- **Tests:** compass bearings, the "points to the next one" rule, a ferry going and coming back (0°, 180°, 180°), and lone points.
+- **Verified in the browser** against the real backend and database, with an out-and-back route: the chevrons point north on the way out and south on the way back.
+
 ## Decisions
 - **Gaps are shown, not hidden.** The overnight data showed about 30 reports per ship per hour, unevenly spread. A plain line through the points would claim knowledge we don't have.
 - **Statistics exclude gaps.** Distance and average speed over a 45-minute silence are unknown, so they are not counted.

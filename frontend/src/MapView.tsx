@@ -15,7 +15,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import { routeBounds, routeToGeo } from "./routeGeo";
-import { ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
+import { chevronIcon, ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
 import { useTrackStore } from "./store";
 import type { LngLat, Track, Zone } from "./types";
 
@@ -171,8 +171,23 @@ export function MapView() {
         layout: { "line-join": "round", "line-cap": "round" },
         paint: { "line-color": "#facc15", "line-width": 2, "line-opacity": 0.85 },
       });
+      // Each received report: a chevron pointing the way the ship went next;
+      // a lone report (no neighbour, no direction) stays a dot.
+      map.addImage("route-chevron", chevronIcon(), { pixelRatio: ICON_PIXEL_RATIO });
       map.addLayer({
-        id: "db-points", type: "circle", source: "db-points",
+        id: "db-points", type: "symbol", source: "db-points",
+        filter: ["!", ["get", "single"]],
+        layout: {
+          "icon-image": "route-chevron",
+          "icon-rotate": ["get", "bearing"],
+          "icon-rotation-alignment": "map", // relative to north, like ship arrows
+          "icon-allow-overlap": true,
+          "icon-size": 0.8,
+        },
+      });
+      map.addLayer({
+        id: "db-points-single", type: "circle", source: "db-points",
+        filter: ["get", "single"],
         paint: { "circle-radius": 2.5, "circle-color": "#facc15", "circle-stroke-color": "#0c1220", "circle-stroke-width": 1 },
       });
       // Hovering a gap says how long there was no data.
