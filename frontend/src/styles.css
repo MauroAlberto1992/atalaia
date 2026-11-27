@@ -30,7 +30,7 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 }
 .panel header { display: flex; justify-content: space-between; align-items: center; }
 .panel h2 { margin: 0; font-size: 15px; }
-.panel button { background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; }
+.panel header button { background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; }
 .panel dl { margin: 10px 0 0; }
 .panel dl div { display: flex; justify-content: space-between; padding: 3px 0; border-top: 1px solid var(--border); }
 .panel dt { color: var(--muted); }
@@ -76,7 +76,33 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
 .alert.coverage_lost .icon { color: #94a3b8; }
 .alert.coverage_restored .icon { color: #22c55e; }
 
+.panel .windows { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+.note.error { color: #f87171; }
+
+.recent {
+  position: absolute; top: 60px; left: 12px; width: 280px; max-width: calc(100% - 24px);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 12px;
+}
+.recent-toggle {
+  width: 100%; padding: 6px 12px; text-align: left; background: none; border: 0;
+  color: var(--text); font: inherit; cursor: pointer;
+}
+.recent-body { max-height: 40vh; overflow-y: auto; border-top: 1px solid var(--border); }
+.recent ul { list-style: none; margin: 0; padding: 0; }
+.recent li button {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 12px;
+  background: none; border: 0; border-bottom: 1px solid var(--border);
+  color: var(--text); font: inherit; cursor: pointer; text-align: left;
+}
+.recent li button:hover { background: rgba(148, 163, 184, 0.1); }
+.recent .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent .meta { color: var(--muted); white-space: nowrap; }
+.dot.class-A { background: #38bdf8; }
+.dot.class-B { background: #4ade80; }
+
 @media (max-width: 600px) {
+  .recent { top: 56px; width: auto; right: 12px; }
   .alerts { bottom: auto; top: 56px; max-height: 25vh; }
   .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; }
 }

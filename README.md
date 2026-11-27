@@ -15,7 +15,7 @@ history, zones and alerts.
 - **Track state** for every ship.
   - Out-of-order reports are dropped.
   - Ships silent for 10 min are flagged stale and removed after 60 min.
-- **Route history** per ship.
+- **Route history** per ship: live, and from the database over 1 h to 7 days, with gaps shown as gaps.
   - Haversine distance and average speed.
   - Filters GPS jitter and impossible jumps.
 - **Anomaly detection**, with each alert explaining why:

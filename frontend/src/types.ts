@@ -52,3 +52,41 @@ export type LiveMessage =
   | { type: "remove"; mmsi: number };
 
 export type ConnectionState = "connecting" | "open" | "closed";
+
+// Phase 14: recorded history from the database.
+export interface RoutePoint {
+  time: string; // ISO 8601
+  lat: number;
+  lon: number;
+  sog: number;
+  cog: number;
+}
+
+export interface RouteStats {
+  points: number;
+  distance_nm: number; // within segments only
+  moving_time_s: number;
+  avg_speed_kn: number;
+  longest_gap_s: number;
+}
+
+// Mirrors backend RouteResponse: the route split where points are > 30 min apart.
+export interface RouteResponse {
+  mmsi: number;
+  hours: number;
+  thinned: boolean;
+  segments: RoutePoint[][];
+  stats: RouteStats;
+}
+
+// Mirrors backend history_db.ShipSeen.
+export interface ShipSeen {
+  mmsi: number;
+  name: string;
+  ais_class: "A" | "B";
+  last_seen: string;
+  points: number;
+}
+
+// The route window: live (in-memory, as before) or N hours from the database.
+export type HistoryWindow = "live" | 1 | 6 | 24 | 168;

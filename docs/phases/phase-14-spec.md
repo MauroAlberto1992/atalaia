@@ -1,6 +1,6 @@
 # Phase 14 spec — Routes from the database
 
-Status: proposed, waiting for approval.
+Status: approved.
 
 ## Goal
 See where a ship has been over hours or days, from the recorded history, not

@@ -1,5 +1,14 @@
 import { create } from "zustand";
-import type { Alert, ConnectionState, LiveMessage, LngLat, Track } from "./types";
+import type {
+  Alert,
+  ConnectionState,
+  HistoryWindow,
+  LiveMessage,
+  LngLat,
+  RouteResponse,
+  ShipSeen,
+  Track,
+} from "./types";
 
 const MAX_ALERTS = 200; // same bound as the backend
 
@@ -11,6 +20,11 @@ export interface TrackState {
   alerts: Alert[]; // newest first
   unseen: number; // alerts received live since the user last looked
   focus: LngLat | null; // map flies here when this changes (new array = new request)
+  // Phase 14: recorded history for the selected ship.
+  window: HistoryWindow; // "live" = in-memory route (as before), else hours from the DB
+  dbRoute: RouteResponse | null;
+  dbError: string | null; // shown in the panel, e.g. "No database configured"
+  historyShip: ShipSeen | null; // selected ship that is no longer on the live map
 }
 
 // Pure reducer: given a /live message, return the new tracks map.
@@ -54,6 +68,8 @@ interface TrackActions {
   setConnection: (c: ConnectionState) => void;
   select: (mmsi: number | null) => void;
   focusAlert: (alert: Alert) => void;
+  setWindow: (w: HistoryWindow) => void;
+  selectHistoric: (ship: ShipSeen) => void;
   markSeen: () => void;
 }
 
@@ -65,6 +81,10 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
   alerts: [],
   unseen: 0,
   focus: null,
+  window: "live",
+  dbRoute: null,
+  dbError: null,
+  historyShip: null,
 
   applyLive: (msg) =>
     set((s) => {
@@ -72,7 +92,8 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
       const alerts = reduceAlerts(s.alerts, msg);
       const unseen = msg.type === "alert" ? s.unseen + 1 : s.unseen;
       // The selected ship may be gone (removed, or missing from a new snapshot).
-      if (s.selected !== null && !(s.selected in tracks))
+      // A ship picked from the recorded history is meant to be off the live map.
+      if (s.selected !== null && !(s.selected in tracks) && s.historyShip === null)
         return { tracks, alerts, unseen, selected: null, route: [] };
       return {
         tracks,
@@ -94,8 +115,36 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
     set({ focus: [t.longitude, t.latitude] });
   },
 
+  setWindow: (w) => {
+    const mmsi = get().selected;
+    set({ window: w, dbRoute: null, dbError: null });
+    if (w === "live" || mmsi === null) return;
+    fetch(`/api/tracks/${mmsi}/route?hours=${w}`)
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = (await r.json().catch(() => null)) as { detail?: string } | null;
+          throw new Error(body?.detail ?? `HTTP ${r.status}`);
+        }
+        return (await r.json()) as RouteResponse;
+      })
+      .then((route) => {
+        // Ignore a late answer for another ship or window.
+        if (get().selected === mmsi && get().window === w) set({ dbRoute: route });
+      })
+      .catch((e: unknown) => {
+        if (get().selected === mmsi && get().window === w) set({ dbError: String(e) });
+      });
+  },
+
+  selectHistoric: (ship) => {
+    // A ship from the database list, possibly no longer live: show 24 h.
+    get().select(ship.mmsi);
+    set({ historyShip: ship });
+    get().setWindow(24);
+  },
+
   select: (mmsi) => {
-    set({ selected: mmsi, route: [] });
+    set({ selected: mmsi, route: [], window: "live", dbRoute: null, dbError: null, historyShip: null });
     if (mmsi === null) return;
     fetch(`/api/tracks/${mmsi}/history`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
