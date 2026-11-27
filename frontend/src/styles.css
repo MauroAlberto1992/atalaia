@@ -110,3 +110,22 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
   .alerts { bottom: auto; top: 56px; max-height: 25vh; }
   .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; }
 }
+
+/* Sensor contact popup (phase 15): dark, like the panels. */
+.contact-popup .maplibregl-popup-content {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  font: 12px/1.5 ui-monospace, monospace;
+  padding: 10px 28px 10px 12px;
+  max-width: 300px;
+}
+.contact-popup .maplibregl-popup-tip { border-top-color: #334155; border-bottom-color: #334155; }
+.contact-popup .maplibregl-popup-close-button { color: #94a3b8; font-size: 16px; }
+.contact-popup .contact-title { font-weight: bold; margin-bottom: 4px; }
+.contact-popup .contact-title.dark { color: #fca5a5; }
+.contact-popup .contact-title.possible { color: #cbd5e1; }
+.contact-popup button {
+  margin-top: 6px; background: #1e293b; color: #7dd3fc; border: 1px solid #334155;
+  border-radius: 4px; padding: 2px 8px; font: inherit; cursor: pointer;
+}

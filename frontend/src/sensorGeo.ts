@@ -20,17 +20,35 @@ export function circleRing(lat: number, lon: number, radiusNm: number, sides = 6
   return ring;
 }
 
-export function darkInfo(d: DarkTrack): string {
-  if (d.possible_mmsi !== null) {
-    const who = d.possible_name || `MMSI ${d.possible_mmsi}`;
-    const age = (d.possible_ais_age_min ?? 0).toFixed(0);
-    return `${d.id}: possibly ${who} (MMSI ${d.possible_mmsi}, AIS ${age} min old): no alert. SIMULATED sensor.`;
-  }
+export interface DarkInfo {
+  title: string;
+  lines: string[];
+  mmsi: number | null; // the AIS ship that could explain it, if any
+}
+
+export function darkInfo(d: DarkTrack): DarkInfo {
   const motion =
     d.sog !== null && d.cog !== null
       ? `~${d.sog.toFixed(0)} kn heading ${d.cog.toFixed(0)}°`
       : "speed not yet known";
-  return `${d.id}: non-cooperative contact (no AIS), ${d.detections} detections, ${motion}. SIMULATED sensor.`;
+  const seen = `${d.detections} sensor detections, ${motion}`;
+  if (d.possible_mmsi !== null) {
+    const age = (d.possible_ais_age_min ?? 0).toFixed(0);
+    return {
+      title: `${d.id}: possibly an AIS ship`,
+      lines: [
+        `${d.possible_name || "unnamed"} (MMSI ${d.possible_mmsi}), last AIS ${age} min ago, could be here.`,
+        seen,
+        "Not dark: no alert. SIMULATED sensor.",
+      ],
+      mmsi: d.possible_mmsi,
+    };
+  }
+  return {
+    title: `${d.id}: dark contact`,
+    lines: [`No AIS ship seen in the last hour could be here.`, seen, "SIMULATED sensor."],
+    mmsi: null,
+  };
 }
 
 export function sensorToGeo(sweep: SensorSweep | null, dark: DarkTrack[]): SensorGeo {
@@ -51,7 +69,7 @@ export function sensorToGeo(sweep: SensorSweep | null, dark: DarkTrack[]): Senso
     dark: {
       type: "FeatureCollection",
       features: dark.filter((d) => d.confirmed).map((d) => ({ type: "Feature" as const,
-        properties: { id: d.id, info: darkInfo(d), possible: d.possible_mmsi !== null },
+        properties: { id: d.id, info: JSON.stringify(darkInfo(d)), possible: d.possible_mmsi !== null },
         geometry: { type: "Point" as const, coordinates: [d.lon, d.lat] } })),
     },
   };

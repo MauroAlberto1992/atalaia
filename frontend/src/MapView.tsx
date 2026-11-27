@@ -16,11 +16,36 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 import { routeBounds, routeToGeo } from "./routeGeo";
 import { chevronIcon, darkIcon, droneIcon, ICON_PIXEL_RATIO, movingIcon, stoppedIcon } from "./shipIcons";
-import { sensorToGeo } from "./sensorGeo";
+import { type DarkInfo, sensorToGeo } from "./sensorGeo";
 import { useTrackStore } from "./store";
 import type { LngLat, Track, Zone } from "./types";
 
 setWorkerUrl(workerUrl);
+
+// Popup for a sensor contact, built with textContent (no HTML from data).
+function contactPopup(info: DarkInfo, popup: Popup): HTMLElement {
+  const box = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = info.mmsi === null ? "contact-title dark" : "contact-title possible";
+  title.textContent = info.title;
+  box.append(title);
+  for (const line of info.lines) {
+    const row = document.createElement("div");
+    row.textContent = line;
+    box.append(row);
+  }
+  if (info.mmsi !== null) {
+    const mmsi = info.mmsi;
+    const btn = document.createElement("button");
+    btn.textContent = `Show MMSI ${mmsi}`;
+    btn.onclick = () => {
+      useTrackStore.getState().select(mmsi);
+      popup.remove();
+    };
+    box.append(btn);
+  }
+  return box;
+}
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark"; // free, no API key
 const STOPPED_KNOTS = 0.5; // below this, show a circle instead of an arrow
@@ -219,12 +244,15 @@ export function MapView() {
       map.addLayer({
         id: "dark-tracks", type: "symbol", source: "dark-tracks",
         layout: { "icon-image": ["case", ["get", "possible"], "possible-ais", "dark"], "icon-allow-overlap": true, "text-field": ["get", "id"], "text-offset": [0, 1.3], "text-size": 11, "text-allow-overlap": true },
-        paint: { "text-color": "#fca5a5", "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
+        paint: { "text-color": ["case", ["get", "possible"], "#cbd5e1", "#fca5a5"], "text-halo-color": "#0c1220", "text-halo-width": 1.5 },
       });
-      const darkPopup = new Popup({ closeButton: true });
+      const darkPopup = new Popup({ closeButton: true, className: "contact-popup" });
       map.on("click", "dark-tracks", (e: MapLayerMouseEvent) => {
-        const p = e.features?.[0]?.properties as { id: string; info: string } | undefined;
-        if (p) darkPopup.setLngLat(e.lngLat).setText(p.info).addTo(map);
+        const p = e.features?.[0]?.properties as { info: string } | undefined;
+        if (!p) return;
+        // GeoJSON properties are flattened to strings, hence JSON.
+        const info = JSON.parse(p.info) as DarkInfo;
+        darkPopup.setLngLat(e.lngLat).setDOMContent(contactPopup(info, darkPopup)).addTo(map);
       });
       // AIS ships also confirmed by the sensor: a thin cyan ring.
       map.addLayer({

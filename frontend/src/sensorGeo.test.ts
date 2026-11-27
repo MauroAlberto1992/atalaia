@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { circleRing, sensorToGeo } from "./sensorGeo";
+import { circleRing, darkInfo, sensorToGeo } from "./sensorGeo";
 import type { DarkTrack, SensorSweep } from "./types";
 
 const sweep: SensorSweep = {
@@ -35,15 +35,21 @@ describe("sensorToGeo", () => {
 describe("dark info", () => {
   it("says when the speed is not known yet", () => {
     const fresh = { ...dark("D-3", true), sog: null, cog: null };
-    const info = String(sensorToGeo(sweep, [fresh]).dark.features[0]?.properties?.info);
-    expect(info).toContain("speed not yet known");
+    expect(darkInfo(fresh).lines.join(" ")).toContain("speed not yet known");
   });
 
   it("names the AIS ship that could explain a contact, and marks it grey", () => {
     const maybe = { ...dark("D-4", true), possible_mmsi: 263000001, possible_name: "MAR AZUL", possible_ais_age_min: 12.4 };
-    const f = sensorToGeo(sweep, [maybe]).dark.features[0];
-    expect(String(f?.properties?.info)).toContain("possibly MAR AZUL (MMSI 263000001, AIS 12 min old)");
-    expect(f?.properties?.possible).toBe(true);
+    const info = darkInfo(maybe);
+    expect(info.title).toBe("D-4: possibly an AIS ship");
+    expect(info.lines[0]).toBe("MAR AZUL (MMSI 263000001), last AIS 12 min ago, could be here.");
+    expect(info.mmsi).toBe(263000001);
+    expect(sensorToGeo(sweep, [maybe]).dark.features[0]?.properties?.possible).toBe(true);
+  });
+
+  it("does not repeat the MMSI when the ship has no name", () => {
+    const maybe = { ...dark("D-5", true), possible_mmsi: 211392060, possible_ais_age_min: 14 };
+    expect(darkInfo(maybe).lines[0]).toBe("unnamed (MMSI 211392060), last AIS 14 min ago, could be here.");
   });
 });
 
