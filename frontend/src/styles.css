@@ -129,3 +129,6 @@ html, body, #root { margin: 0; height: 100%; background: var(--bg); }
   margin-top: 6px; background: #1e293b; color: #7dd3fc; border: 1px solid #334155;
   border-radius: 4px; padding: 2px 8px; font: inherit; cursor: pointer;
 }
+
+/* "Back to the whole area" map button. */
+.maplibregl-ctrl-group button.home-button { font-size: 18px; line-height: 1; color: #0f172a; }

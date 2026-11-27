@@ -130,16 +130,39 @@ export function MapView() {
     });
     mapRef.current = map;
 
+    // "Home" button: back to the configured area (the start view).
+    let home: [[number, number], [number, number]] | null = null;
+    map.addControl(
+      {
+        onAdd: () => {
+          const box = document.createElement("div");
+          box.className = "maplibregl-ctrl maplibregl-ctrl-group";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "home-button";
+          btn.title = "Back to the whole area";
+          btn.setAttribute("aria-label", "Back to the whole area");
+          btn.textContent = "⌂";
+          btn.onclick = () => {
+            if (home) map.fitBounds(home, { padding: 20 });
+            else map.jumpTo({ center: [-8.0, 38.5], zoom: 6 });
+          };
+          box.append(btn);
+          return box;
+        },
+        onRemove: () => {},
+      },
+      "top-right",
+    );
+
     fetch("/api/area")
       .then((r) => r.json())
       .then((area: { boxes: Box[] }) => {
         // Frame the union of all boxes (e.g. mainland + Madeira + Azores).
         const lats = area.boxes.flatMap(([[a], [b]]) => [a, b]);
         const lons = area.boxes.flatMap(([[, a], [, b]]) => [a, b]);
-        map.fitBounds(
-          [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
-          { padding: 20, animate: false },
-        );
+        home = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
+        map.fitBounds(home, { padding: 20, animate: false });
       })
       .catch(() => {}); // keep the default view if the backend is down
 
