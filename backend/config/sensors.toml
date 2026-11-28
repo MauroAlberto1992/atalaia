@@ -34,7 +34,8 @@ gate_growth_nm_per_min = 0.1  # ...widened by this per minute since its last rep
 gate_max_nm = 2.0
 confirm_hits = 3          # M-of-N: a candidate is confirmed as dark after
 confirm_window = 5        # M detections in the last N sweeps
-candidate_gate_nm = 0.6   # unassociated detections join a candidate within this
+candidate_gate_nm = 0.6   # unassociated detections join a candidate within this...
+candidate_max_jump_nm = 2.0  # ...or a plausible hop since, but never further than this
 max_speed_kn = 40         # implied speed between a candidate's detections
 drop_after_min = 10       # forget a candidate/dark track with no detection for this long
 # Before calling a contact dark: could any AIS ship seen recently be there?

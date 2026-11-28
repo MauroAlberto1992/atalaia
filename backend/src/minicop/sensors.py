@@ -19,23 +19,25 @@ import tomllib
 from datetime import datetime
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from minicop.config import BACKEND_DIR, Corner
 from minicop.events import Track
-from minicop.geo import haversine_nm
+from minicop.geo import haversine_nm, project
 
 DEFAULT_SENSORS_FILE = BACKEND_DIR / "config" / "sensors.toml"
 
 
 class DroneConfig(BaseModel):
+    # Bounds checked at load: impossible values used to load fine and then
+    # divide by zero or silently confirm nothing (found in review).
     id: str
-    speed_kn: float
-    footprint_nm: float
-    sweep_s: float
-    pd: float
-    position_sigma_m: float
-    false_alarms_per_sweep: float
+    speed_kn: float = Field(ge=0)
+    footprint_nm: float = Field(gt=0)
+    sweep_s: float = Field(gt=0)
+    pd: float = Field(ge=0, le=1)
+    position_sigma_m: float = Field(ge=0)
+    false_alarms_per_sweep: float = Field(ge=0)
     seed: int
     patrol: list[Corner]
 
@@ -48,19 +50,26 @@ class DarkTargetConfig(BaseModel):
 
 
 class FusionConfig(BaseModel):
-    track_max_age_min: float
-    gate_nm: float
-    gate_growth_nm_per_min: float
-    gate_max_nm: float
-    confirm_hits: int
-    confirm_window: int
-    candidate_gate_nm: float
-    max_speed_kn: float
-    drop_after_min: float
-    explain_max_age_min: float
-    explain_base_nm: float
-    explain_speed_factor: float
-    explain_speed_margin_kn: float
+    track_max_age_min: float = Field(gt=0)
+    gate_nm: float = Field(gt=0)
+    gate_growth_nm_per_min: float = Field(ge=0)
+    gate_max_nm: float = Field(gt=0)
+    confirm_hits: int = Field(ge=1)
+    confirm_window: int = Field(ge=1)
+    candidate_gate_nm: float = Field(gt=0)
+    candidate_max_jump_nm: float = Field(gt=0)
+    max_speed_kn: float = Field(gt=0)
+    drop_after_min: float = Field(gt=0)
+    explain_max_age_min: float = Field(ge=0)
+    explain_base_nm: float = Field(gt=0)  # divides in explain_by_ais
+    explain_speed_factor: float = Field(ge=0)
+    explain_speed_margin_kn: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _hits_fit_window(self) -> "FusionConfig":
+        if self.confirm_hits > self.confirm_window:
+            raise ValueError("confirm_hits must be <= confirm_window, or nothing ever confirms")
+        return self
 
 
 class SensorsConfig(BaseModel):
@@ -162,13 +171,18 @@ class DroneSimulator:
                 )
             )
 
-        # Real ships: their latest AIS position is the best "truth" we have.
+        # Real ships: their latest AIS report, moved on to the sweep time at its
+        # speed and course, is the best "truth" we have. Detecting them at the
+        # reported position (up to 10 min old) put the detection behind where
+        # the fusion predicts the ship, so moving ships failed to associate
+        # (found in review).
         for tr in ais_tracks:
-            if (
-                not tr.stale
-                and haversine_nm(lat0, lon0, tr.latitude, tr.longitude) <= d.footprint_nm
-            ):
-                detect(tr.latitude, tr.longitude, f"ais:{tr.mmsi}")
+            if tr.stale:
+                continue
+            hours = max(0.0, (t - tr.last_seen).total_seconds() / 3600)
+            lat, lon = project(tr.latitude, tr.longitude, tr.sog, tr.cog, hours)
+            if haversine_nm(lat0, lon0, lat, lon) <= d.footprint_nm:
+                detect(lat, lon, f"ais:{tr.mmsi}")
         for name, (lat, lon) in self.dark_positions(t).items():
             if haversine_nm(lat0, lon0, lat, lon) <= d.footprint_nm:
                 detect(lat, lon, f"dark:{name}")

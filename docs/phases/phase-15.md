@@ -26,6 +26,15 @@
 - **Tests:** 18 fusion and simulator tests, 2 end-to-end API tests and 5 frontend tests. Totals: 172 backend, 35 frontend.
 
 ## Evaluation (6 simulated hours, 40 synthetic AIS ships, seed 42)
+
+> **Correction (code review, phase 17a).** All the tables below, before
+> "Re-measured after the review", came from a flawed simulation: the "sparse
+> AIS" scenario gave each ship a fixed delay that only changed now and then,
+> so its reported position still moved forward every sweep. It simulated a
+> continuous feed with a constant lag, not a sparse one. Moving ships also
+> sailed out of the patrol area within the first hour, so long runs mostly
+> measured stopped ships. Those numbers are kept, struck through in spirit, for
+> the record; **use the re-measured table**.
 | Scenario | Dark targets | Time to confirm | False dark (clutter) | AIS ships reported dark | AIS detections → right MMSI / unassociated |
 |---|---|---|---|---|---|
 | Default (Pd 0.9, 0.5 clutter/sweep, AIS ≤ 3 min old) | 2/2 | 1.0 min | 0 | 0 | 99.9% / 0.0% |
@@ -55,6 +64,30 @@ Tested on the developer's Mac, the dark targets were rarely seen: the drone flie
 The earlier 147-minute delay for DARK-2 depended on its old path among the synthetic ships; the risk itself (a dark target near AIS ships is "explained") remains: 5 dark contacts were explained at some point.
 
 Demo speed: `MINICOP_SENSOR_SWEEP_S=1` and `MINICOP_DRONE_SPEED_KN=600` in `.env` give one patrol loop in ~8 min (drone only; dark targets keep their real speed).
+
+### Re-measured after the review (corrected simulation)
+Each ship's reports now get through at random, on average every `report_every_min`;
+between reports the fusion has only the last one, whose age keeps growing (sparse
+scenario: median age 5 min, 90th percentile 16.5 min). Moving ships bounce inside
+the patrol area. The fusion fixes from the review are included (AIS check at the
+contact's time, clock tolerance, bounded attach gate, recent-window speed).
+
+| Scenario | Dark targets | Time to confirm | False dark (clutter) | AIS ships reported dark | AIS detections → right MMSI / unassociated |
+|---|---|---|---|---|---|
+| Default (a report every ~1 min) | 2/2 | 1.0 / 1.0 min | 0 (0-1 over 8 seeds) | 0 | 99.8% / 0.1% |
+| Harder (Pd 0.7, 2 clutter/sweep) | 2/2 | 1.0 / 1.5 min | **9** (mean 6.9, range 2-11 over 8 seeds) | 0 | 99.8% / 0.0% |
+| **Sparse AIS (a report every ~8 min)** | 2/2 | 1.0 / 1.0 min | 0 | **4** (mean 5.6, range 2-9 over 5 seeds) | 77.4% / 22.1% |
+
+What the comparison says (same corrected simulation, seed 42):
+- **Sparse AIS, AIS ships reported dark:** 71 with the recent-AIS check off,
+  **22** with the check as it was before the review, **4** after the review fixes.
+- **Harder, clutter false darks:** the fusion *before* the review gives the
+  same mean (7.0 over the same 8 seeds). The rise from the old "3" comes from
+  the simulation (more ships near the drone change the random sequence), not
+  from the fixes. Clutter at 2 per sweep is the main weakness left.
+- Dark targets: confirmed within ~1 min in every scenario; they were "explained"
+  by a nearby AIS ship at some point 8-11 times per run, without delaying the
+  first confirmation.
 
 ### Position noise in the plausibility check
 In the fast demo (sweeps 1 s apart) no contact was ever confirmed: 150 m of position noise between fixes 1 s apart reads as ~300 kn, so the per-hop speed check rejected everything. Each hop may now be up to `max_speed x time + 3 sigma` of the difference of two noisy fixes. Measured: in 30 min of fast demo, 6 confirmations (every pass of each dark target); 2 sigma kept only 4. Cost: in the harder scenario, clutter false darks went from 1 to 4 in 6 h; the other scenarios are unchanged.
@@ -92,6 +125,7 @@ In the fast demo (sweeps 1 s apart) no contact was ever confirmed: 150 m of posi
 | The scripted dark targets were placed inside the patrol box, where the perimeter-flying drone rarely sees them (9% / 6% of the time). | The developer, waiting in the live demo. | Measured, then moved next to the drone's route (13% / 18%). |
 | The per-hop speed check ignored position noise, so with 1 s sweeps nothing ever confirmed; the fast-demo option was shipped after checking only that the drone moved. | The developer could not find a single dark contact in the live demo. | Noise term added (3 sigma), regression test that fails on the old rule, fast demo measured end to end. |
 | After checking that the new test fails on the old rule (noise set to 0 with `sed`, then back to 3), the test kept failing: Python reused the bytecode cached for the "0" version, because the file had the same size and modification second. | Tracing the rule by hand gave "confirm" while the method said no. | Cleared `__pycache__`; mutate code for such checks in memory, not by editing the file back and forth. |
+| **The "sparse AIS" evaluation did not simulate a sparse feed** (fixed delay, position still moving every sweep), and moving ships left the area; the published "38 → 4" and "39 → 6" came from it. | The code review of phase 17a. | Simulation rewritten (reports at random, age grows between them; ships bounce in the area); everything re-measured over several seeds; the old tables kept with a correction note. |
 | Two scripted edits failed on text that `ruff format` had already reflowed, and one put a constant above the imports. | ruff (E402) and the edit script's own assertion. | Re-read the current text before scripted edits. |
 
 ## How to run

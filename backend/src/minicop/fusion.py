@@ -24,26 +24,37 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 
 from minicop.events import Track
-from minicop.geo import haversine_nm
+from minicop.geo import haversine_nm, project
 from minicop.sensors import Detection, FusionConfig, Sweep
 
 # Speed and course are only reported once a contact's detections span this long.
 MIN_SPAN_FOR_SPEED = timedelta(minutes=3)
 
 
+# AIS timestamps come from aisstream, the sweep time from the local clock. A
+# report this far "in the future" is taken as just now: excluding it (as before)
+# left a ship reporting every few seconds unassociated whenever the local clock
+# ran slightly behind, so a transmitting ship could be called dark (review).
+CLOCK_TOLERANCE = timedelta(seconds=60)
+# Speed is estimated over the contact's recent detections only: from the first
+# detection, a loitering target looped back and showed ~0 kn (review).
+VELOCITY_WINDOW = timedelta(minutes=10)
+
+
 def dead_reckon(track: Track, t: datetime) -> tuple[float, float]:
     """Where the ship would be at `t`, keeping its last speed and course.
     COG 360 means "not available": then assume it stayed put."""
     hours = (t - track.last_seen).total_seconds() / 3600
-    if track.cog >= 360 or track.sog <= 0 or hours <= 0:
-        return track.latitude, track.longitude
-    dist_nm = track.sog * hours
-    north = dist_nm * math.cos(math.radians(track.cog))
-    east = dist_nm * math.sin(math.radians(track.cog))
-    return (
-        track.latitude + north / 60,
-        track.longitude + east / (60 * math.cos(math.radians(track.latitude))),
-    )
+    return project(track.latitude, track.longitude, track.sog, track.cog, hours)
+
+
+def _age(t: datetime, track: Track) -> timedelta | None:
+    """Age of an AIS report at `t`, clamped at 0 within CLOCK_TOLERANCE; None
+    if it is from further in the future."""
+    age = t - track.last_seen
+    if age < -CLOCK_TOLERANCE:
+        return None
+    return max(age, timedelta(0))
 
 
 def gate_nm(cfg: FusionConfig, age: timedelta) -> float:
@@ -54,29 +65,32 @@ def gate_nm(cfg: FusionConfig, age: timedelta) -> float:
 def explain_by_ais(
     lat: float, lon: float, t: datetime, tracks: list[Track], cfg: FusionConfig
 ) -> tuple[Track, float] | None:
-    """The AIS track that could best be at (lat, lon) at `t`, or None.
+    """The AIS track that could best have been at (lat, lon) at `t` (the time
+    the contact was last detected), or None.
 
-    Reach is deliberately generous: from the *last reported* position (no dead
+    Reach is deliberately generous: from the *reported* position (no dead
     reckoning, since the ship may have turned), at the reported speed x factor
-    plus a margin (a stopped ship can start moving). Returns (track, minutes
-    since its report); the best is the smallest distance / reach ratio."""
+    plus a margin (a stopped ship can start moving), over the time between the
+    report and `t`, whichever came first. A report made after the contact was
+    last seen counts too: before the review, the gap was measured to the sweep
+    time, so a ship reporting again later could stop explaining its own contact.
+    Returns (track, minutes between report and contact); best = smallest
+    distance / reach ratio."""
     max_age = timedelta(minutes=cfg.explain_max_age_min)
-    best: tuple[float, Track] | None = None
+    best: tuple[float, Track, float] | None = None
     for tr in tracks:
-        age = t - tr.last_seen
-        if not timedelta(0) <= age <= max_age:
+        gap = abs(t - tr.last_seen)
+        if gap > max_age:
             continue
-        hours = age.total_seconds() / 3600
+        hours = gap.total_seconds() / 3600
         reach = (
             cfg.explain_base_nm
             + (tr.sog * cfg.explain_speed_factor + cfg.explain_speed_margin_kn) * hours
         )
         ratio = haversine_nm(lat, lon, tr.latitude, tr.longitude) / reach
         if ratio <= 1 and (best is None or ratio < best[0]):
-            best = (ratio, tr)
-    if best is None:
-        return None
-    return best[1], (t - best[1].last_seen).total_seconds() / 60
+            best = (ratio, tr, hours * 60)
+    return (best[1], best[2]) if best else None
 
 
 def associate(
@@ -85,13 +99,17 @@ def associate(
     """Greedy global nearest neighbour. Returns ({detection index: mmsi},
     [indexes of unassociated detections])."""
     max_age = timedelta(minutes=cfg.track_max_age_min)
-    usable = [tr for tr in tracks if timedelta(0) <= t - tr.last_seen <= max_age]
+    usable = []
+    for tr in tracks:
+        age = _age(t, tr)
+        if age is not None and age <= max_age:
+            usable.append((tr, age))
     pairs: list[tuple[float, int, int]] = []
     for i, det in enumerate(detections):
-        for tr in usable:
+        for tr, age in usable:
             plat, plon = dead_reckon(tr, t)
             d = haversine_nm(det.lat, det.lon, plat, plon)
-            if d <= gate_nm(cfg, t - tr.last_seen):
+            if d <= gate_nm(cfg, age):
                 pairs.append((d, i, tr.mmsi))
     pairs.sort()
     matched: dict[int, int] = {}
@@ -140,9 +158,10 @@ class _Candidate:
         return self.points[-1]
 
     def velocity(self) -> tuple[float, float] | None:
-        """(sog kn, cog deg) from first to last detection, or None if they span
-        less than MIN_SPAN_FOR_SPEED (too noisy to be worth showing)."""
-        a, b = self.points[0], self.points[-1]
+        """(sog kn, cog deg) over the detections of the last VELOCITY_WINDOW, or
+        None if they span less than MIN_SPAN_FOR_SPEED (too noisy to show)."""
+        b = self.points[-1]
+        a = next(p for p in self.points if b.time - p.time <= VELOCITY_WINDOW)
         if b.time - a.time < MIN_SPAN_FOR_SPEED:
             return None
         hours = (b.time - a.time).total_seconds() / 3600
@@ -195,7 +214,7 @@ class FusionEngine:
         for c in self._candidates:
             if not c.confirmed:
                 continue
-            c.explained = explain_by_ais(c.last.lat, c.last.lon, t, tracks, self.cfg)
+            c.explained = explain_by_ais(c.last.lat, c.last.lon, c.last.time, tracks, self.cfg)
             if c.explained is None and not c.alerted:
                 c.alerted = True
                 newly.append(c)
@@ -220,9 +239,17 @@ class FusionEngine:
             if hours <= 0:
                 continue  # one detection per candidate per sweep
             d = haversine_nm(det.lat, det.lon, last.lat, last.lon)
-            # Within the gate, or reachable at a plausible speed (a moving
-            # target seen a few sweeps ago can be further than the gate).
-            if d > max(self.cfg.candidate_gate_nm, self.cfg.max_speed_kn * hours):
+            # Within the gate, or reachable at a plausible speed (a moving target
+            # seen a few sweeps ago can be further than the gate); but never an
+            # implausible hop (the confirmation rule: one such point used to get
+            # in with sweeps < ~23 s apart and block confirmation for good), and
+            # never further than candidate_max_jump_nm (a confirmed contact
+            # unseen for minutes used to take detections anywhere in the
+            # footprint: 40 kn x 9 min = 6 nm). Both found in review.
+            # Measured: making the gate the noise-inclusive hop limit instead
+            # nearly tripled clutter false confirmations (1.0 -> 2.9 per 5 h).
+            gate = max(self.cfg.candidate_gate_nm, self.cfg.max_speed_kn * hours)
+            if d > min(gate, self._hop_limit_nm(last, det), self.cfg.candidate_max_jump_nm):
                 continue
             if best is None or d < best[0]:
                 best = (d, c)
@@ -237,12 +264,15 @@ class FusionEngine:
         # could travel, plus what position noise alone can add (3 sigma of the
         # difference of two noisy fixes). Without the noise term, sweeps 1 s
         # apart never confirmed anything: 150 m of noise in 1 s reads ~300 kn.
-        for p, q in zip(c.points, c.points[1:], strict=False):
-            hours = (q.time - p.time).total_seconds() / 3600
-            noise_nm = 3 * math.sqrt(p.sigma_m**2 + q.sigma_m**2) / 1852
-            if haversine_nm(p.lat, p.lon, q.lat, q.lon) > self.cfg.max_speed_kn * hours + noise_nm:
-                return False
-        return True
+        return all(
+            haversine_nm(p.lat, p.lon, q.lat, q.lon) <= self._hop_limit_nm(p, q)
+            for p, q in zip(c.points, c.points[1:], strict=False)
+        )
+
+    def _hop_limit_nm(self, p: Detection, q: Detection) -> float:
+        hours = (q.time - p.time).total_seconds() / 3600
+        noise_nm = 3 * math.sqrt(p.sigma_m**2 + q.sigma_m**2) / 1852
+        return self.cfg.max_speed_kn * hours + noise_nm
 
     def _as_dark(self, c: _Candidate) -> DarkTrack:
         v = c.velocity()

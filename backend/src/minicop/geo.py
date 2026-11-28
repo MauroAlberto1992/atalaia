@@ -63,3 +63,17 @@ def point_in_polygon(lat: float, lon: float, polygon: list[tuple[float, float]])
             if lon < cross_lon:
                 inside = not inside
     return inside
+
+
+def project(
+    lat: float, lon: float, sog_kn: float, cog_deg: float, hours: float
+) -> tuple[float, float]:
+    """Position after `hours` at constant speed and course (flat approximation,
+    fine for the few nm a ship covers between reports). COG >= 360 means "not
+    available": then the ship is assumed to stay put."""
+    if cog_deg >= 360 or sog_kn <= 0 or hours <= 0:
+        return lat, lon
+    dist_nm = sog_kn * hours
+    north = dist_nm * math.cos(math.radians(cog_deg))
+    east = dist_nm * math.sin(math.radians(cog_deg))
+    return lat + north / 60, lon + east / (60 * math.cos(math.radians(lat)))
