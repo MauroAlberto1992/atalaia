@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 204701450,
+  "MMSI_String": 204701450,
+  "ShipName": "ILHAS DE BRUMA",
+  "latitude": 37.74057,
+  "longitude": -25.65953,
+  "time_utc": "2026-11-28 03:47:58.756625525 +0000 UTC"
+ },
+ "MessageType": "StaticDataReport",
+ "Message": {
+  "StaticDataReport": {
+   "MessageID": 24,
+   "PartNumber": false,
+   "RepeatIndicator": 0,
+   "ReportA": {
+    "Name": "ILHAS DE BRUMA",
+    "Valid": true
+   },
+   "ReportB": {
+    "CallSign": "",
+    "Dimension": {
+     "A": 0,
+     "B": 0,
+     "C": 0,
+     "D": 0
+    },
+    "FixType": 0,
+    "ShipType": 0,
+    "Spare": 0,
+    "Valid": false,
+    "VenderIDModel": 0,
+    "VenderIDSerial": 0,
+    "VendorIDName": ""
+   },
+   "Reserved": 0,
+   "UserID": 204701450,
+   "Valid": true
+  }
+ }
+}

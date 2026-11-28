@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 204708000,
+  "MMSI_String": 204708000,
+  "ShipName": "FURNAS",
+  "latitude": 37.73548,
+  "longitude": -25.66671,
+  "time_utc": "2026-11-28 03:50:26.091780622 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 2,
+   "CallSign": "CSBK",
+   "Destination": "PTPDL",
+   "Dimension": {
+    "A": 96,
+    "B": 4,
+    "C": 12,
+    "D": 6
+   },
+   "Dte": false,
+   "Eta": {
+    "Day": 27,
+    "Hour": 23,
+    "Minute": 45,
+    "Month": 10
+   },
+   "FixType": 1,
+   "ImoNumber": 9164548,
+   "MaximumStaticDraught": 5,
+   "MessageID": 5,
+   "Name": "FURNAS",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 70,
+   "UserID": 204708000,
+   "Valid": true
+  }
+ }
+}

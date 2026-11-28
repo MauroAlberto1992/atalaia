@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 225987240,
+  "MMSI_String": 225987240,
+  "ShipName": "",
+  "latitude": 42.12148,
+  "longitude": -8.84547,
+  "time_utc": "2026-11-28 03:48:00.448489098 +0000 UTC"
+ },
+ "MessageType": "StaticDataReport",
+ "Message": {
+  "StaticDataReport": {
+   "MessageID": 24,
+   "PartNumber": true,
+   "RepeatIndicator": 0,
+   "ReportA": {
+    "Name": "",
+    "Valid": false
+   },
+   "ReportB": {
+    "CallSign": "",
+    "Dimension": {
+     "A": 10,
+     "B": 4,
+     "C": 2,
+     "D": 3
+    },
+    "FixType": 0,
+    "ShipType": 36,
+    "Spare": 0,
+    "Valid": true,
+    "VenderIDModel": 1,
+    "VenderIDSerial": 830014,
+    "VendorIDName": "NVC"
+   },
+   "Reserved": 0,
+   "UserID": 225987240,
+   "Valid": true
+  }
+ }
+}

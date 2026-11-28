@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 263441683,
+  "MMSI_String": 263441683,
+  "ShipName": "DORIS               ",
+  "latitude": 41.18904,
+  "longitude": -8.69568,
+  "time_utc": "2026-11-28 03:50:44.716983164 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 2,
+   "CallSign": "CSZU2  ",
+   "Destination": "LEIXOES             ",
+   "Dimension": {
+    "A": 12,
+    "B": 13,
+    "C": 5,
+    "D": 8
+   },
+   "Dte": false,
+   "Eta": {
+    "Day": 19,
+    "Hour": 9,
+    "Minute": 5,
+    "Month": 10
+   },
+   "FixType": 1,
+   "ImoNumber": 9903595,
+   "MaximumStaticDraught": 5.2,
+   "MessageID": 5,
+   "Name": "DORIS               ",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 52,
+   "UserID": 263441683,
+   "Valid": true
+  }
+ }
+}

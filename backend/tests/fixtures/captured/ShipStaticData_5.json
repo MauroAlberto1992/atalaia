@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 224040390,
+  "MMSI_String": 224040390,
+  "ShipName": "ELMAR DOS           ",
+  "latitude": 37.07455,
+  "longitude": -8.17074,
+  "time_utc": "2026-11-28 03:48:58.388031677 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 1,
+   "CallSign": "EAJM   ",
+   "Destination": "VILAMOURA",
+   "Dimension": {
+    "A": 33,
+    "B": 7,
+    "C": 3,
+    "D": 5
+   },
+   "Dte": false,
+   "Eta": {
+    "Day": 9,
+    "Hour": 12,
+    "Minute": 0,
+    "Month": 9
+   },
+   "FixType": 1,
+   "ImoNumber": 8624591,
+   "MaximumStaticDraught": 1.3,
+   "MessageID": 5,
+   "Name": "ELMAR DOS           ",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 7,
+   "UserID": 224040390,
+   "Valid": true
+  }
+ }
+}

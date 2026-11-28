@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 244662000,
+  "MMSI_String": 244662000,
+  "ShipName": "FILIA ARIEA",
+  "latitude": 38.64086,
+  "longitude": -9.80953,
+  "time_utc": "2026-11-28 03:48:40.474732224 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 2,
+   "CallSign": "PIET",
+   "Destination": "SEEMA",
+   "Dimension": {
+    "A": 75,
+    "B": 15,
+    "C": 7,
+    "D": 7
+   },
+   "Dte": false,
+   "Eta": {
+    "Day": 5,
+    "Hour": 7,
+    "Minute": 0,
+    "Month": 12
+   },
+   "FixType": 1,
+   "ImoNumber": 9488815,
+   "MaximumStaticDraught": 4.4,
+   "MessageID": 5,
+   "Name": "FILIA ARIEA",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 70,
+   "UserID": 244662000,
+   "Valid": true
+  }
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 263810850,
+  "MMSI_String": 263810850,
+  "ShipName": "OBBI 1",
+  "latitude": 37.74005,
+  "longitude": -25.65831,
+  "time_utc": "2026-11-28 03:48:22.456179221 +0000 UTC"
+ },
+ "MessageType": "StaticDataReport",
+ "Message": {
+  "StaticDataReport": {
+   "MessageID": 24,
+   "PartNumber": false,
+   "RepeatIndicator": 0,
+   "ReportA": {
+    "Name": "OBBI 1",
+    "Valid": true
+   },
+   "ReportB": {
+    "CallSign": "",
+    "Dimension": {
+     "A": 0,
+     "B": 0,
+     "C": 0,
+     "D": 0
+    },
+    "FixType": 0,
+    "ShipType": 0,
+    "Spare": 0,
+    "Valid": false,
+    "VenderIDModel": 0,
+    "VenderIDSerial": 0,
+    "VendorIDName": ""
+   },
+   "Reserved": 0,
+   "UserID": 263810850,
+   "Valid": true
+  }
+ }
+}

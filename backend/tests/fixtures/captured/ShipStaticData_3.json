@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 370732000,
+  "MMSI_String": 370732000,
+  "ShipName": "GLORIOUS MAPLE      ",
+  "latitude": 41.14808,
+  "longitude": -8.79163,
+  "time_utc": "2026-11-28 03:47:56.476986931 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 1,
+   "CallSign": "3FYI3  ",
+   "Destination": "PT LEI              ",
+   "Dimension": {
+    "A": 176,
+    "B": 24,
+    "C": 13,
+    "D": 19
+   },
+   "Dte": false,
+   "Eta": {
+    "Day": 27,
+    "Hour": 23,
+    "Minute": 0,
+    "Month": 11
+   },
+   "FixType": 1,
+   "ImoNumber": 9357925,
+   "MaximumStaticDraught": 10.6,
+   "MessageID": 5,
+   "Name": "GLORIOUS MAPLE      ",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 70,
+   "UserID": 370732000,
+   "Valid": true
+  }
+ }
+}

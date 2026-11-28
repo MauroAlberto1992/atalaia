@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 263701360,
+  "MMSI_String": 263701360,
+  "ShipName": "DAMIAO DE GOES",
+  "latitude": 38.65118,
+  "longitude": -9.07813,
+  "time_utc": "2026-11-28 03:50:39.239118327 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 0,
+   "CallSign": "CSKD",
+   "Destination": "BARREIRO",
+   "Dimension": {
+    "A": 18,
+    "B": 34,
+    "C": 7,
+    "D": 7
+   },
+   "Dte": false,
+   "Eta": {
+    "Day": 12,
+    "Hour": 17,
+    "Minute": 0,
+    "Month": 12
+   },
+   "FixType": 0,
+   "ImoNumber": 9270098,
+   "MaximumStaticDraught": 2,
+   "MessageID": 5,
+   "Name": "DAMIAO DE GOES",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 40,
+   "UserID": 263701360,
+   "Valid": true
+  }
+ }
+}

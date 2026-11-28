@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 263701380,
+  "MMSI_String": 263701380,
+  "ShipName": "FERNANDO NAMORA",
+  "latitude": 38.65329,
+  "longitude": -9.08064,
+  "time_utc": "2026-11-28 03:47:49.273049873 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 0,
+   "CallSign": "CSKF",
+   "Destination": "LISBOA TAGUS RIVER",
+   "Dimension": {
+    "A": 22,
+    "B": 27,
+    "C": 6,
+    "D": 6
+   },
+   "Dte": true,
+   "Eta": {
+    "Day": 13,
+    "Hour": 21,
+    "Minute": 30,
+    "Month": 4
+   },
+   "FixType": 0,
+   "ImoNumber": 0,
+   "MaximumStaticDraught": 1.5,
+   "MessageID": 5,
+   "Name": "FERNANDO NAMORA",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 68,
+   "UserID": 263701380,
+   "Valid": true
+  }
+ }
+}

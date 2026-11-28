@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 218059840,
+  "MMSI_String": 218059840,
+  "ShipName": "SEA GIRL",
+  "latitude": 37.73812,
+  "longitude": -25.66459,
+  "time_utc": "2026-11-28 03:48:45.121549089 +0000 UTC"
+ },
+ "MessageType": "StaticDataReport",
+ "Message": {
+  "StaticDataReport": {
+   "MessageID": 24,
+   "PartNumber": false,
+   "RepeatIndicator": 0,
+   "ReportA": {
+    "Name": "SEA GIRL",
+    "Valid": true
+   },
+   "ReportB": {
+    "CallSign": "",
+    "Dimension": {
+     "A": 0,
+     "B": 0,
+     "C": 0,
+     "D": 0
+    },
+    "FixType": 0,
+    "ShipType": 0,
+    "Spare": 0,
+    "Valid": false,
+    "VenderIDModel": 0,
+    "VenderIDSerial": 0,
+    "VendorIDName": ""
+   },
+   "Reserved": 0,
+   "UserID": 218059840,
+   "Valid": true
+  }
+ }
+}

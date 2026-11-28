@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 204600008,
+  "MMSI_String": 204600008,
+  "ShipName": "PERO DE TEIVE",
+  "latitude": 37.73524,
+  "longitude": -25.66878,
+  "time_utc": "2026-11-28 03:50:01.101035305 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 2,
+   "CallSign": "CSJW",
+   "Destination": "PONTA DELGADA",
+   "Dimension": {
+    "A": 10,
+    "B": 25,
+    "C": 5,
+    "D": 5
+   },
+   "Dte": false,
+   "Eta": {
+    "Day": 30,
+    "Hour": 3,
+    "Minute": 30,
+    "Month": 8
+   },
+   "FixType": 15,
+   "ImoNumber": 9011480,
+   "MaximumStaticDraught": 3.6,
+   "MessageID": 5,
+   "Name": "PERO DE TEIVE",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 52,
+   "UserID": 204600008,
+   "Valid": true
+  }
+ }
+}

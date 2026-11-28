@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 263997000,
+  "MMSI_String": 263997000,
+  "ShipName": "",
+  "latitude": 41.18612,
+  "longitude": -8.70565,
+  "time_utc": "2026-11-28 03:48:24.599611207 +0000 UTC"
+ },
+ "MessageType": "StaticDataReport",
+ "Message": {
+  "StaticDataReport": {
+   "MessageID": 24,
+   "PartNumber": true,
+   "RepeatIndicator": 0,
+   "ReportA": {
+    "Name": "",
+    "Valid": false
+   },
+   "ReportB": {
+    "CallSign": "CRAG4",
+    "Dimension": {
+     "A": 6,
+     "B": 6,
+     "C": 2,
+     "D": 1
+    },
+    "FixType": 0,
+    "ShipType": 36,
+    "Spare": 0,
+    "Valid": true,
+    "VenderIDModel": 0,
+    "VenderIDSerial": 262144,
+    "VendorIDName": "ONW"
+   },
+   "Reserved": 0,
+   "UserID": 263997000,
+   "Valid": true
+  }
+ }
+}

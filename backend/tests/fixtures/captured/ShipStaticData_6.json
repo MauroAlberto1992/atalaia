@@ -1,0 +1,41 @@
+{
+ "MetaData": {
+  "MMSI": 255805991,
+  "MMSI_String": 255805991,
+  "ShipName": "SAO JORGE           ",
+  "latitude": 37.73783,
+  "longitude": -25.66328,
+  "time_utc": "2026-11-28 03:50:00.682762504 +0000 UTC"
+ },
+ "MessageType": "ShipStaticData",
+ "Message": {
+  "ShipStaticData": {
+   "AisVersion": 1,
+   "CallSign": "CQIL3  ",
+   "Destination": "PT PDL              ",
+   "Dimension": {
+    "A": 67,
+    "B": 17,
+    "C": 4,
+    "D": 8
+   },
+   "Dte": false,
+   "Eta": {
+    "Day": 24,
+    "Hour": 22,
+    "Minute": 30,
+    "Month": 11
+   },
+   "FixType": 1,
+   "ImoNumber": 9479644,
+   "MaximumStaticDraught": 4.7,
+   "MessageID": 5,
+   "Name": "SAO JORGE           ",
+   "RepeatIndicator": 0,
+   "Spare": false,
+   "Type": 80,
+   "UserID": 255805991,
+   "Valid": true
+  }
+ }
+}
