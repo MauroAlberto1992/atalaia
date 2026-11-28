@@ -79,6 +79,25 @@ Areas are configured in `backend/config/areas.toml`, optional fixed zones in
 `backend/config/zones.toml` (operators can also draw their own areas on the map), and port areas come from OpenStreetMap in
 `backend/config/ports.json` (© OpenStreetMap contributors, ODbL). Coordinates there are `[lat, lon]`, latitude first.
 
+### Sea depth (bathymetry)
+Depth at each ship position, and the "impossible position" check (a ship where
+the sea is shallower than its declared draught, or inland), use the EMODnet
+Digital Bathymetry DTM 2024 (~115 m grid). The Algarve cut is in the repository
+(`backend/config/bathymetry/algarve.bin.xz`, 0.44 MB). For the whole coast
+(`MINICOP_AREA=portugal`) generate it once; it downloads ~1 GB of EMODnet tiles
+and the result stays local (not in Git):
+
+```bash
+cd backend && python scripts/fetch_bathymetry.py --area portugal
+```
+
+Without a file for the configured area, depth and the impossible-position check
+are simply off (the backend logs how to generate it).
+
+This data product was created by EMODnet (https://emodnet.ec.europa.eu/en/), and
+is owned by the EU and licensed under the Creative Commons Attribution 4.0
+International (CC BY 4.0) license. **Not for navigation.**
+
 ## Ideas for next steps
 Not planned yet; candidates for a v2. The first two come first: they are
 what maritime surveillance work (maritime domain awareness) is actually about.
