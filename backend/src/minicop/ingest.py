@@ -1,4 +1,5 @@
-"""Ingestion: keep a connection to aisstream open and push PositionEvents to a queue."""
+"""Ingestion: keep a connection to aisstream open and push PositionEvents and
+StaticEvents (phase 17a) to the state task's queue."""
 
 import asyncio
 import json
@@ -100,6 +101,10 @@ async def run_ingestion(
                         status.positions += 1
                         status.positions_by_class[event.ais_class] += 1
                         await events.put(event)
+                        continue
+                    # Only frames of a static type: an invalid frame was already
+                    # logged by parse_event, and must not be logged twice.
+                    if not any(f'"{t}"' in frame for t in STATIC_TYPES):
                         continue
                     static = parse_static(frame)
                     if static:

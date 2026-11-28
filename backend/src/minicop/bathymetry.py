@@ -101,8 +101,10 @@ class Bathymetry:
 
     def _cell(self, lat: float, lon: float) -> int | None:
         for g in self._grids:
-            r = int((g.lat_top - lat) / g.cell_deg)
-            c = int((lon - g.lon_left) / g.cell_deg)
+            # floor, not int(): int() truncates towards zero, so a point up to
+            # one cell north or west of the grid mapped to row/column 0 (found in review).
+            r = math.floor((g.lat_top - lat) / g.cell_deg)
+            c = math.floor((lon - g.lon_left) / g.cell_deg)
             if 0 <= r < g.rows and 0 <= c < g.cols:
                 return int(g.depths[r * g.cols + c])
         return None
@@ -112,8 +114,10 @@ class Bathymetry:
         cells around the point). Used to skip places too close to the coast for
         a ~115 m grid to say anything."""
         for g in self._grids:
-            r = int((g.lat_top - lat) / g.cell_deg)
-            c = int((lon - g.lon_left) / g.cell_deg)
+            # floor, not int(): int() truncates towards zero, so a point up to
+            # one cell north or west of the grid mapped to row/column 0 (found in review).
+            r = math.floor((g.lat_top - lat) / g.cell_deg)
+            c = math.floor((lon - g.lon_left) / g.cell_deg)
             if not (0 <= r < g.rows and 0 <= c < g.cols):
                 continue
             n = max(1, round(radius_m / (g.cell_deg * 111_320)))  # cells (north-south size)

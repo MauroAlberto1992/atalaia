@@ -82,15 +82,20 @@ class TrackStore:
             sensor_seen=current.sensor_seen if current else None,
             distance_nm=stats.distance_nm,
             avg_speed_kn=stats.avg_speed_kn,
-            **self._context(event.mmsi, event.latitude, event.longitude),
+            **self._context(event.mmsi, event.latitude, event.longitude, current),
         )
         self._tracks[event.mmsi] = track
         self.accepted += 1
         return track
 
-    def _context(self, mmsi: int, lat: float, lon: float) -> dict[str, object]:
-        """Declared static data and the depth here (phase 17a)."""
-        info = self._static.get(mmsi, StaticInfo())
+    def _context(
+        self, mmsi: int, lat: float, lon: float, current: Track | None = None
+    ) -> dict[str, object]:
+        """Declared static data and the depth here (phase 17a). If the static
+        store has evicted this ship, keep what its track already had."""
+        info = self._static.get(mmsi) or StaticInfo(
+            current.ship_type if current else None, current.draught_m if current else None
+        )
         return {
             "ship_type": info.ship_type,
             "ship_type_label": ship_type_label(info.ship_type),

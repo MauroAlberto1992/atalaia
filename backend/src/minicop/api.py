@@ -73,6 +73,11 @@ class HistoryResponse(BaseModel):
     stats: HistoryStats
 
 
+@dataclass
+class ErrorCount:
+    count: int = 0
+
+
 async def run_state(
     events: EventQueue,
     store: TrackStore,
@@ -83,9 +88,13 @@ async def run_state(
     recorder: Recorder | None = None,
     sensor: "SimulatedSensor | None" = None,
     context: ContextMonitor | None = None,
+    errors: "ErrorCount | None" = None,
 ) -> None:
-    """The only task that mutates the store, the alert engine and the anomaly detector.
-    Publishes every change to the hub."""
+    """The only task that mutates the store (tracks and static data), the alert
+    engine, the anomaly, coverage and context monitors, and the drawn areas.
+    Publishes every change to the hub. An error in one event is logged and
+    counted (`errors`, shown in /health) and the loop goes on."""
+    errors = errors or ErrorCount()
 
     def publish_alerts(alerts: list[Alert]) -> None:
         for alert in alerts:
@@ -98,6 +107,12 @@ async def run_state(
                 updated = store.apply_static(event)
                 if updated is not None:
                     hub.publish({"type": "track", "track": updated.model_dump(mode="json")})
+                    # A draught arriving after the position is checked now, not
+                    # at the next report (a silent ship might never send one).
+                    # Not recorded here: that would duplicate a position row;
+                    # the ships table gets it with the next position.
+                    if context is not None:
+                        publish_alerts(context.on_track(updated))
             elif isinstance(event, ZoneAdded):
                 engine.add_zone(event.zone, store.snapshot())
                 hub.publish({"type": "zones"})  # clients refetch GET /zones
@@ -153,6 +168,11 @@ async def run_state(
                 window = timedelta(minutes=anomalies.cfg.spoof_window_min)
                 jumps = store.jumps_since(event.mmsi, event.received_at - window)
                 publish_alerts(anomalies.on_position(event, jumps))
+        except Exception:
+            # One bad event must not kill the only writer: before this, the map
+            # froze silently and /health still said all was well (found in review).
+            log.exception("State task: error handling event, skipped | event: %.200r", event)
+            errors.count += 1
         finally:
             events.task_done()  # lets tests await events.join()
 
@@ -287,6 +307,8 @@ class Runtime:
     area: Area | None
     # Names of the areas drawn by operators (phase 16). Kept here, under
     # zone_lock, so the API can check names without waiting for the state task.
+    bathymetry: Bathymetry | None = None
+    state_errors: ErrorCount = field(default_factory=ErrorCount)
     user_zone_names: set[str] = field(default_factory=set)
     zone_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -310,10 +332,10 @@ async def load_saved_zones(rt: Runtime) -> None:
                 log.warning("Could not load drawn areas yet: %s", exc)
             else:
                 async with rt.zone_lock:
-                    for zone in zones:
-                        if zone.name not in rt.user_zone_names:
-                            rt.user_zone_names.add(zone.name)
-                            await rt.events.put(ZoneAdded(zone=zone))
+                    new = [z for z in zones if z.name not in rt.user_zone_names]
+                    rt.user_zone_names.update(z.name for z in new)
+                for zone in new:  # outside the lock: this put may wait on a full queue
+                    await rt.events.put(ZoneAdded(zone=zone))
                 log.info("Loaded %d drawn areas", len(zones))
                 return
         await asyncio.sleep(2)
@@ -348,6 +370,22 @@ def _simulated_sensor(enabled: bool | None, cfg: SensorsConfig | None) -> Simula
         fusion=FusionEngine(cfg.fusion),
         sweep_s=cfg.drone.sweep_s,
     )
+
+
+def _area_from_env() -> str:
+    return os.getenv("MINICOP_AREA", "algarve").strip()
+
+
+def _bathymetry_for(area_name: str) -> Bathymetry | None:
+    bathy = load_bathymetry(area_name)
+    if bathy is None:
+        log.warning(
+            "No bathymetry for area '%s': depth and impossible-position checks are off. "
+            "Run: python scripts/fetch_bathymetry.py --area %s",
+            area_name,
+            area_name,
+        )
+    return bathy
 
 
 def _history_db_from_env() -> HistoryDB | None:
@@ -389,20 +427,6 @@ def create_app(
     app.state.runtime.events. zones defaults to config/zones.toml; tests pass their own."""
     # Alert zones from zones.toml, plus port areas from OpenStreetMap (ports.json).
     zone_list = load_zones() + load_ports() if zones is None else zones
-    # Phase 17a: bathymetry for the configured area (True = load the file for
-    # MINICOP_AREA if it exists; tests pass a Bathymetry, or None for none).
-    if bathymetry is True:
-        area_name = os.getenv("MINICOP_AREA", "algarve").strip()
-        bathy = load_bathymetry(area_name)
-        if bathy is None:
-            log.warning(
-                "No bathymetry for area '%s': depth and impossible-position checks are off. "
-                "Run: python scripts/fetch_bathymetry.py --area %s",
-                area_name,
-                area_name,
-            )
-    else:
-        bathy = bathymetry or None
     context_cfg = load_context_config()
     anomaly_cfg = load_anomaly_config() if anomaly_config is None else anomaly_config
     coverage_cfg = load_coverage_config() if coverage_config is None else coverage_config
@@ -410,6 +434,15 @@ def create_app(
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings = load_settings() if ingest else None  # fails fast if the API key is missing
+        # Phase 17a: bathymetry for the configured area. Loaded here, after
+        # load_settings() has read .env: at import time MINICOP_AREA may not be
+        # set yet (found in review). True = load the file if it exists; tests
+        # pass a Bathymetry, or None for none.
+        bathy = (
+            _bathymetry_for(settings.area.name if settings else _area_from_env())
+            if bathymetry is True
+            else bathymetry or None
+        )
         alert_engine = AlertEngine(zone_list)
         rt = Runtime(
             events=asyncio.Queue(maxsize=EVENT_QUEUE_SIZE),
@@ -424,6 +457,7 @@ def create_app(
             sensor=_simulated_sensor(simulated_sensor, sensors_config),
             status=IngestStatus(),
             area=settings.area if settings else None,
+            bathymetry=bathy,
         )
         app.state.runtime = rt
         tasks = [
@@ -438,6 +472,7 @@ def create_app(
                     rt.recorder,
                     rt.sensor,
                     rt.context,
+                    rt.state_errors,
                 )
             ),
             asyncio.create_task(run_clock(rt.events)),
@@ -478,6 +513,7 @@ def create_app(
             "positions_class_a": rt.status.positions_by_class["A"],
             "positions_class_b": rt.status.positions_by_class["B"],
             "static_frames": rt.status.statics,
+            "state_errors": rt.state_errors.count,  # events the state task failed on
             "positions_accepted": rt.store.accepted,
             "rejected_out_of_order": rt.store.out_of_order,
             "rejected_jumps": rt.store.jumps_rejected,
@@ -492,10 +528,12 @@ def create_app(
         return runtime().area
 
     shading_cache: dict[int, bytes] = {}
+    shading_lock = asyncio.Lock()
 
     @app.get("/bathymetry")
     async def bathymetry_info() -> dict[str, object]:
         """Phase 17a: whether depth data is loaded, its bounds and attribution."""
+        bathy = runtime().bathymetry
         if bathy is None:
             return {"available": False}
         return {"available": True, "attribution": ACKNOWLEDGEMENT, "grids": bathy.grids()}
@@ -503,10 +541,15 @@ def create_app(
     @app.get("/bathymetry/{index}.png")
     async def bathymetry_png(index: int) -> Response:
         """Depth shading for the map (computed once per grid, then cached)."""
+        bathy = runtime().bathymetry
         if bathy is None or not 0 <= index < len(bathy.grids()):
             raise HTTPException(404, "No such bathymetry grid")
-        if index not in shading_cache:
-            shading_cache[index] = bathy.shading_png(index)
+        # Computing the image takes ~0.5 s for a whole-coast grid: in a thread,
+        # so the state task and /live keep running (found in review), and under
+        # a lock so two first requests don't both compute it.
+        async with shading_lock:
+            if index not in shading_cache:
+                shading_cache[index] = await asyncio.to_thread(bathy.shading_png, index)
         return Response(shading_cache[index], media_type="image/png")
 
     @app.get("/zones")
@@ -536,8 +579,15 @@ def create_app(
                         503, f"Area not saved, database unavailable: {exc}"
                     ) from exc
                 saved = True
+            try:
+                # Not `await put`: waiting on a full queue would hold the lock
+                # and hang every other area request (found in review).
+                rt.events.put_nowait(ZoneAdded(zone=zone))
+            except asyncio.QueueFull:
+                if saved and rt.history_db is not None:
+                    await delete_user_zone(await rt.history_db.pool(), zone.name)  # undo
+                raise HTTPException(503, "Busy: the area was not created, try again") from None
             rt.user_zone_names.add(zone.name)
-            await rt.events.put(ZoneAdded(zone=zone))
         return ZoneCreated(zone=zone, saved=saved)
 
     @app.delete("/zones/{name}", status_code=204)
@@ -549,13 +599,19 @@ def create_app(
                 raise HTTPException(409, "Only areas drawn on the map can be deleted")
             if name not in rt.user_zone_names:
                 raise HTTPException(404, f'No drawn area called "{name}"')
+            zone = next((z for z in rt.alerts.zones if z.name == name), None)
             if rt.history_db is not None:
                 try:
                     await delete_user_zone(await rt.history_db.pool(), name)
                 except (OSError, asyncpg.PostgresError) as exc:
                     raise HTTPException(503, f"Database unavailable: {exc}") from exc
+            try:
+                rt.events.put_nowait(ZoneRemoved(name=name))  # never wait holding the lock
+            except asyncio.QueueFull:
+                if zone is not None and rt.history_db is not None:
+                    await save_user_zone(await rt.history_db.pool(), zone)  # undo
+                raise HTTPException(503, "Busy: the area was not deleted, try again") from None
             rt.user_zone_names.discard(name)
-            await rt.events.put(ZoneRemoved(name=name))
 
     @app.get("/alerts")
     async def alerts() -> list[Alert]:
