@@ -59,6 +59,7 @@ def test_migrations_apply_once():
                 "001_positions.sql",
                 "002_ais_class.sql",
                 "003_user_zones.sql",
+                "004_ship_static.sql",
             ]
             assert await migrate(conn) == []  # idempotent
             hypertables = await conn.fetchval(
@@ -110,6 +111,9 @@ def test_recorder_writes_positions_and_ships():
                     navigational_status=0,
                     last_seen=T0 + timedelta(seconds=10 * s),
                     ais_class="B" if s == 2 else "A",
+                    # Phase 17a: static data; the last report has none and must not erase it.
+                    ship_type=None if s == 2 else 70,
+                    draught_m=None if s == 2 else 10.6,
                 )
             )
         task = asyncio.create_task(recorder.run())
@@ -129,6 +133,7 @@ def test_recorder_writes_positions_and_ships():
             ship = await conn.fetchrow("SELECT * FROM ships WHERE mmsi = 263000001")
             assert ship["name"] == "TEST SHIP"  # empty name didn't overwrite it
             assert ship["last_seen"] == T0 + timedelta(seconds=20)
+            assert ship["ship_type"] == 70 and abs(ship["draught_m"] - 10.6) < 1e-3
         finally:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)

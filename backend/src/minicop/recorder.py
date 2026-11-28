@@ -15,6 +15,7 @@ import logging
 import time
 from collections import deque
 from datetime import datetime
+from typing import NamedTuple
 
 import asyncpg
 
@@ -42,12 +43,21 @@ POSITION_COLUMNS = [
 ]
 
 
+class ShipRow(NamedTuple):
+    """Per-ship data written to the ships table (phase 17a adds type and draught)."""
+
+    name: str
+    seen: datetime
+    ship_type: int | None = None
+    draught_m: float | None = None
+
+
 class RecordBuffer:
     """Bounded FIFO of rows waiting to be written. Pure, no I/O."""
 
     def __init__(self, max_rows: int = MAX_BUFFERED) -> None:
         self._rows: deque[PositionRow] = deque(maxlen=max_rows)
-        self._names: dict[int, tuple[str, datetime]] = {}  # latest name per ship
+        self._names: dict[int, ShipRow] = {}  # latest known data per ship
         self.dropped = 0
 
     def add(self, track: Track) -> None:
@@ -71,15 +81,25 @@ class RecordBuffer:
         # already in the table, not a ship first written in this batch).
         previous = self._names.get(track.mmsi)
         name = track.ship_name or (previous[0] if previous else "")
-        self._names[track.mmsi] = (name, track.last_seen)
+        # Same for static data (phase 17a): None means "not known", not "erase".
+        self._names[track.mmsi] = ShipRow(
+            name,
+            track.last_seen,
+            track.ship_type
+            if track.ship_type is not None
+            else (previous.ship_type if previous else None),
+            track.draught_m
+            if track.draught_m is not None
+            else (previous.draught_m if previous else None),
+        )
 
-    def take(self, n: int) -> tuple[list[PositionRow], dict[int, tuple[str, datetime]]]:
+    def take(self, n: int) -> tuple[list[PositionRow], dict[int, ShipRow]]:
         """Remove up to n oldest rows, plus the ship names seen so far."""
         rows = [self._rows.popleft() for _ in range(min(n, len(self._rows)))]
         names, self._names = self._names, {}
         return rows, names
 
-    def put_back(self, rows: list[PositionRow], names: dict[int, tuple[str, datetime]]) -> None:
+    def put_back(self, rows: list[PositionRow], names: dict[int, ShipRow]) -> None:
         """A write failed: return the rows to the front, keeping order. If new
         rows arrived meanwhile and there is no room, the oldest are dropped."""
         for row in reversed(rows):
@@ -154,7 +174,7 @@ class Recorder:
     async def _write(
         conn: asyncpg.Connection,
         rows: list[PositionRow],
-        names: dict[int, tuple[str, datetime]],
+        names: dict[int, ShipRow],
     ) -> None:
         async with conn.transaction():
             await conn.copy_records_to_table("positions", records=rows, columns=POSITION_COLUMNS)
@@ -163,12 +183,14 @@ class Recorder:
                 # first/last seen window.
                 await conn.executemany(
                     """
-                    INSERT INTO ships (mmsi, name, first_seen, last_seen)
-                    VALUES ($1, $2, $3, $3)
+                    INSERT INTO ships (mmsi, name, first_seen, last_seen, ship_type, draught_m)
+                    VALUES ($1, $2, $3, $3, $4, $5)
                     ON CONFLICT (mmsi) DO UPDATE SET
                         name = COALESCE(NULLIF(EXCLUDED.name, ''), ships.name),
                         first_seen = LEAST(ships.first_seen, EXCLUDED.first_seen),
-                        last_seen = GREATEST(ships.last_seen, EXCLUDED.last_seen)
+                        last_seen = GREATEST(ships.last_seen, EXCLUDED.last_seen),
+                        ship_type = COALESCE(EXCLUDED.ship_type, ships.ship_type),
+                        draught_m = COALESCE(EXCLUDED.draught_m, ships.draught_m)
                     """,
-                    [(mmsi, name, seen) for mmsi, (name, seen) in names.items()],
+                    [(mmsi, r.name, r.seen, r.ship_type, r.draught_m) for mmsi, r in names.items()],
                 )

@@ -70,7 +70,10 @@ def test_latest_name_per_ship_is_kept():
     buf.add(track(1, 5, name="NEW"))
     buf.add(track(2, 1, name="OTHER"))
     _, names = buf.take(10)
-    assert names == {1: ("NEW", T0 + timedelta(seconds=5)), 2: ("OTHER", T0 + timedelta(seconds=1))}
+    assert {k: (v.name, v.seen) for k, v in names.items()} == {
+        1: ("NEW", T0 + timedelta(seconds=5)),
+        2: ("OTHER", T0 + timedelta(seconds=1)),
+    }
 
 
 def test_empty_name_does_not_replace_a_known_one():
@@ -80,4 +83,6 @@ def test_empty_name_does_not_replace_a_known_one():
     buf.add(track(1, 0, name="KNOWN"))
     buf.add(track(1, 5, name=""))
     _, names = buf.take(10)
-    assert names == {1: ("KNOWN", T0 + timedelta(seconds=5))}
+    assert {k: (v.name, v.seen) for k, v in names.items()} == {
+        1: ("KNOWN", T0 + timedelta(seconds=5))
+    }
