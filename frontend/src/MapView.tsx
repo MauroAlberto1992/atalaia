@@ -1,6 +1,7 @@
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
 import type { FeatureCollection } from "geojson";
 import {
+  AttributionControl,
   MapLibreMap,
   Popup,
   setWorkerUrl,
@@ -88,6 +89,9 @@ function contactPopup(info: DarkInfo, popup: Popup): HTMLElement {
   return box;
 }
 
+// Short credit for the map; the full EMODnet acknowledgement is in the README.
+const DEPTH_CREDIT =
+  'Depth: <a href="https://emodnet.ec.europa.eu/en/" target="_blank" rel="noreferrer">EMODnet</a> DTM 2024, EU, CC BY 4.0. Not for navigation.';
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark"; // free, no API key
 const STOPPED_KNOTS = 0.5; // below this, show a circle instead of an arrow
 
@@ -167,9 +171,14 @@ export function MapView() {
       style: STYLE_URL,
       center: [-8.0, 38.5], // replaced by the configured area below
       zoom: 6,
+      // One compact attribution control, added once we know whether the
+      // bathymetry (and its credit) is loaded: two controls stacked into a
+      // wide banner that covered the alerts panel (seen in the browser test).
+      attributionControl: false,
     });
     mapRef.current = map;
 
+    const depthLayers: string[] = [];
     // Framed by the "whole area" button (store.goHome) and at start.
     let home: [[number, number], [number, number]] | null = null;
 
@@ -222,6 +231,28 @@ export function MapView() {
           })
           .catch(() => {});
       void loadZones();
+
+      // Depth shading (phase 17a): one image per bathymetry grid, hidden until toggled.
+      // Inserted below the zones so areas and ships stay on top.
+      fetch("/api/bathymetry")
+        .then((r) => r.json())
+        .then((info: { available: boolean; attribution?: string; grids?: { south: number; west: number; north: number; east: number }[] }) => {
+          map.addControl(new AttributionControl({ compact: true, customAttribution: info.available ? DEPTH_CREDIT : undefined }));
+          if (!info.available || !info.grids) return;
+          info.grids.forEach((g, i) => {
+            map.addSource(`depth-${i}`, {
+              type: "image",
+              url: `/api/bathymetry/${i}.png`,
+              coordinates: [[g.west, g.north], [g.east, g.north], [g.east, g.south], [g.west, g.south]],
+            });
+            map.addLayer(
+              { id: `depth-${i}`, type: "raster", source: `depth-${i}`, layout: { visibility: useTrackStore.getState().showDepth ? "visible" : "none" }, paint: { "raster-opacity": 0.8 } },
+              "zones-fill",
+            );
+            depthLayers.push(`depth-${i}`);
+          });
+        })
+        .catch(() => map.addControl(new AttributionControl({ compact: true })));
 
       // Area being drawn (phase 16): its outline and points.
       map.addSource("draft", { type: "geojson", data: draftGeoJSON([], false) });
@@ -381,6 +412,7 @@ export function MapView() {
       // render cycle: the map is updated directly, nothing re-renders.
       let lastFocus: LngLat | null = null;
       let lastHome = useTrackStore.getState().homeRequests;
+      let lastShowDepth = useTrackStore.getState().showDepth;
       let lastZonesVersion = useTrackStore.getState().zonesVersion;
       let lastDraft: unknown = null;
       let lastDraftClosed = false;
@@ -392,6 +424,10 @@ export function MapView() {
         const { tracks, selected, route, focus, window, dbRoute, sensor, dark, showDetections, homeRequests } =
           useTrackStore.getState();
         const st = useTrackStore.getState();
+        if (st.showDepth !== lastShowDepth) {
+          lastShowDepth = st.showDepth;
+          for (const id of depthLayers) map.setLayoutProperty(id, "visibility", st.showDepth ? "visible" : "none");
+        }
         if (st.zonesVersion !== lastZonesVersion) {
           lastZonesVersion = st.zonesVersion;
           void loadZones();

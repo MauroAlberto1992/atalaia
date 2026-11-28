@@ -20,6 +20,7 @@ const GROUP_OF: Record<Alert["kind"], AlertGroup> = {
   coverage_restored: "system",
   dark_vessel: "system",
   dark_in_zone: "zones",
+  impossible_position: "behaviour",
 };
 
 export function groupOf(alert: Alert): AlertGroup {

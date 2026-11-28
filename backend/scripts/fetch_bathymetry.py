@@ -4,7 +4,7 @@ Run from backend/:  python scripts/fetch_bathymetry.py [--area algarve]
 
 Downloads the ESRI ASCII tile(s) covering each box of the area from
 downloads.emodnet-bathymetry.eu, keeps only the cells inside the box (plus a
-small margin), and writes config/bathymetry/<area>.bin.gz (see
+small margin), and writes config/bathymetry/<area>.bin.xz (see
 minicop/bathymetry.py for the format).
 
 Source: EMODnet Digital Bathymetry (DTM 2024), ~115 m grid, CC BY 4.0.
@@ -24,10 +24,11 @@ import io
 import itertools
 import urllib.request
 import zipfile
+from array import array
 from collections.abc import Iterator
 from pathlib import Path
 
-from minicop.bathymetry import Grid, write_grids
+from minicop.bathymetry import LAND, Grid, write_grids
 from minicop.config import BACKEND_DIR, load_area
 
 BASE_URL = "https://downloads.emodnet-bathymetry.eu/v12"
@@ -79,15 +80,19 @@ def cut(asc: io.TextIOBase, lat_min: float, lon_min: float, lat_max: float, lon_
     stream = numbers(asc)
     for _ in itertools.islice(stream, r0 * ncols):
         pass  # rows north of the box
-    rows: list[list[int | None]] = []
+    # Built straight into an int16 array (2 bytes per cell): the whole
+    # mainland coast is ~18 M cells, too many for Python lists of ints.
+    depths: array[int] = array("h")
     for _ in range(r1 - r0):
         row = list(itertools.islice(stream, ncols))[c0:c1]
-        rows.append([None if float(v) == nodata else round(-float(v)) for v in row])
+        depths.extend(LAND if float(v) == nodata else round(-float(v)) for v in row)
     return Grid(
         lat_top=y_top - r0 * cs,
         lon_left=x0 + c0 * cs,
         cell_deg=cs,
-        depths=rows,
+        rows=r1 - r0,
+        cols=c1 - c0,
+        depths=depths,
     )
 
 
@@ -113,10 +118,10 @@ def main() -> None:
                 name = next(n for n in z.namelist() if n.endswith(".asc"))
                 with z.open(name) as f:
                     grid = cut(io.TextIOWrapper(f, encoding="ascii"), *part)
-            sea = sum(d is not None for row in grid.depths for d in row)
-            print(f"  {tile}: {len(grid.depths)} x {len(grid.depths[0])} cells, {sea} at sea")
+            sea = sum(1 for d in grid.depths if d != LAND)
+            print(f"  {tile}: {grid.rows} x {grid.cols} cells, {sea} at sea")
             grids.append(grid)
-    out: Path = BACKEND_DIR / "config" / "bathymetry" / f"{args.area}.bin.gz"
+    out: Path = BACKEND_DIR / "config" / "bathymetry" / f"{args.area}.bin.xz"
     write_grids(out, grids)
     print(f"Wrote {out} ({out.stat().st_size / 1e6:.2f} MB)")
 

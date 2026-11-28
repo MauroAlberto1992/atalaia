@@ -11,6 +11,8 @@ export function StatusBar() {
   const darkCount = useTrackStore((s) => s.dark.filter((d) => d.confirmed && d.possible_mmsi === null).length);
   const showDetections = useTrackStore((s) => s.showDetections);
   const toggleDetections = useTrackStore((s) => s.toggleDetections);
+  const showDepth = useTrackStore((s) => s.showDepth);
+  const toggleDepth = useTrackStore((s) => s.toggleDepth);
   return (
     <div className="status">
       <strong>MINI-COP</strong>
@@ -29,6 +31,9 @@ export function StatusBar() {
           </button>
         </>
       )}
+      <button className="chip" aria-pressed={showDepth} onClick={toggleDepth} title="Sea depth, EMODnet (not for navigation)">
+        Depth
+      </button>
       {unseen > 0 && <span className="badge">{unseen} new alert{unseen > 1 ? "s" : ""}</span>}
     </div>
   );

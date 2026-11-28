@@ -20,5 +20,5 @@ dist/
 .idea/
 .DS_Store
 *.tsbuildinfo
-backend/config/bathymetry/*.bin.gz
-!backend/config/bathymetry/algarve.bin.gz
+backend/config/bathymetry/*.bin.xz
+!backend/config/bathymetry/algarve.bin.xz

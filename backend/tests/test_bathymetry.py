@@ -32,13 +32,11 @@ def test_land_is_land_and_outside_is_unknown():
 
 
 def test_round_trip_keeps_values_and_land(tmp_path: Path):
-    grid = Grid(
-        lat_top=37.0, lon_left=-9.0, cell_deg=0.01, depths=[[10, 12, None], [3000, 2990, 5]]
-    )
+    grid = Grid.from_rows(37.0, -9.0, 0.01, [[10, 12, None], [3000, 2990, 5]])
     path = tmp_path / "t.bin.gz"
     write_grids(path, [grid])
     b = Bathymetry(path)
     assert b.depth_m(36.995, -8.995) == 10
     assert b.depth_m(36.995, -8.975) is None and b.is_land(36.995, -8.975)
-    assert b.depth_m(36.985, -8.995) == 3000  # big jump between rows/cells survives the deltas
+    assert b.depth_m(36.985, -8.995) == 3000  # big jump survives the byte shuffle
     assert b.depth_m(36.985, -8.975) == 5

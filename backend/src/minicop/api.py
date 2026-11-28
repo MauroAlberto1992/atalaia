@@ -13,12 +13,12 @@ from datetime import UTC, datetime, timedelta
 from typing import cast
 
 import asyncpg
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from minicop.alerts import Alert, AlertEngine, AlertKind
 from minicop.anomalies import AnomalyConfig, AnomalyDetector, load_anomaly_config
-from minicop.bathymetry import Bathymetry, load_bathymetry
+from minicop.bathymetry import ACKNOWLEDGEMENT, Bathymetry, load_bathymetry
 from minicop.config import Area, load_settings
 from minicop.context import ContextMonitor, load_context_config
 from minicop.coverage import CoverageConfig, CoverageMonitor, load_coverage_config
@@ -490,6 +490,24 @@ def create_app(
     async def area() -> Area | None:
         """The configured area, so the map can frame it without hard-coding it."""
         return runtime().area
+
+    shading_cache: dict[int, bytes] = {}
+
+    @app.get("/bathymetry")
+    async def bathymetry_info() -> dict[str, object]:
+        """Phase 17a: whether depth data is loaded, its bounds and attribution."""
+        if bathy is None:
+            return {"available": False}
+        return {"available": True, "attribution": ACKNOWLEDGEMENT, "grids": bathy.grids()}
+
+    @app.get("/bathymetry/{index}.png")
+    async def bathymetry_png(index: int) -> Response:
+        """Depth shading for the map (computed once per grid, then cached)."""
+        if bathy is None or not 0 <= index < len(bathy.grids()):
+            raise HTTPException(404, "No such bathymetry grid")
+        if index not in shading_cache:
+            shading_cache[index] = bathy.shading_png(index)
+        return Response(shading_cache[index], media_type="image/png")
 
     @app.get("/zones")
     async def zones_() -> list[Zone]:

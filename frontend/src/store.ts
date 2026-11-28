@@ -37,6 +37,7 @@ export interface TrackState {
   sensor: SensorSweep | null;
   dark: DarkTrack[];
   showDetections: boolean;
+  showDepth: boolean; // depth shading layer (phase 17a)
 }
 
 // Pure reducer: given a /live message, return the new tracks map.
@@ -82,6 +83,7 @@ interface TrackActions {
   focusAlert: (alert: Alert) => void;
   setWindow: (w: HistoryWindow) => void;
   toggleDetections: () => void;
+  toggleDepth: () => void;
   selectHistoric: (ship: ShipSeen) => void;
   markSeen: () => void;
   goHome: () => void;
@@ -112,6 +114,7 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
   sensor: null,
   dark: [],
   showDetections: false,
+  showDepth: false,
 
   applyLive: (msg) =>
     set((s) => {
@@ -149,6 +152,7 @@ export const useTrackStore = create<TrackState & TrackActions>()((set, get) => (
   markSeen: () => set({ unseen: 0 }),
 
   toggleDetections: () => set((s) => ({ showDetections: !s.showDetections })),
+  toggleDepth: () => set((s) => ({ showDepth: !s.showDepth })),
 
   focusAlert: (alert) => {
     const t = get().tracks[alert.mmsi];

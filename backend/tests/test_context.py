@@ -162,3 +162,20 @@ def test_monitor_alerts_once_per_episode_and_re_arms():
     assert mon.on_track(ship(*OFFSHORE_25M, draught=10.6, t=T0 + timedelta(hours=5))) == []
     again = mon.on_track(ship(*SHALLOW_8M, draught=10.6, t=T0 + timedelta(hours=10)))
     assert len(again) == 1
+
+
+def test_bathymetry_endpoints():
+    from fastapi.testclient import TestClient
+
+    from minicop.api import create_app
+
+    with TestClient(create_app(ingest=False, zones=[], bathymetry=B)) as client:
+        info = client.get("/bathymetry").json()
+        assert info["available"] and "CC BY 4.0" in info["attribution"]
+        assert "Not for navigation" in info["attribution"]
+        assert len(info["grids"]) == 1 and info["grids"][0]["north"] > 37.3
+        png = client.get("/bathymetry/0.png")
+        assert png.status_code == 200 and png.content.startswith(b"\x89PNG")
+        assert client.get("/bathymetry/1.png").status_code == 404
+    with TestClient(create_app(ingest=False, zones=[], bathymetry=None)) as client:
+        assert client.get("/bathymetry").json() == {"available": False}

@@ -54,6 +54,10 @@ export function ShipPanel() {
     ? [
         ["MMSI", String(track.mmsi)],
         ["AIS class", track.ais_class === "B" ? "B (small craft)" : "A"],
+        ["Type", track.ship_type_label || "not reported"],
+        ["Draught", track.draught_m != null ? `${track.draught_m.toFixed(1)} m (declared)` : "not reported"],
+        // EMODnet grid, ~115 m cells: approximate, and not for navigation.
+        ["Depth here", track.depth_m != null ? `~${track.depth_m.toFixed(0)} m (EMODnet)` : "n/a"],
         [
           "Source",
           // Confirmed by the (simulated) sensor in the last 2 minutes.

@@ -11,6 +11,11 @@ export interface Track {
   last_seen: string; // ISO 8601, UTC
   ais_class: "A" | "B"; // A = ships, B = small craft (fishing, leisure)
   sensor_seen?: string | null; // last (simulated) sensor confirmation, ISO 8601
+  // Phase 17a: declared static data and the sea depth here (EMODnet); absent/null when unknown.
+  ship_type?: number | null;
+  ship_type_label?: string;
+  draught_m?: number | null;
+  depth_m?: number | null;
   stale: boolean; // silent for 10+ min
   distance_nm: number; // over the backend's stored history
   avg_speed_kn: number;
@@ -37,7 +42,8 @@ export interface Zone {
 export interface Alert {
   id: number;
   kind: "enter" | "exit" | "speeding" | "dark" | "loitering" | "rendezvous" | "reappeared" | "spoofing"
-    | "coverage_lost" | "coverage_restored" | "dark_vessel" | "dark_in_zone";
+    | "coverage_lost" | "coverage_restored" | "dark_vessel" | "dark_in_zone"
+    | "impossible_position";
   mmsi: number;
   ship_name: string;
   zone: string | null; // null for behavioural anomalies
