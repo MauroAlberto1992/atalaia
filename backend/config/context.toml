@@ -1,0 +1,12 @@
+# Environmental context (phase 17a). Every threshold has its reason.
+
+# A position is "impossible" when the sea there is shallower than the ship's
+# declared draught plus this margin. The margin covers tides (the Algarve's
+# range is a few metres), the grid's vertical error and squat; and a declared
+# draught is the maximum, often not the current one.
+draught_margin_m = 3.0
+
+# The grid has ~115 m cells: closer than this to the coast (land and sea both
+# within this radius), depth and "on land" can't be told reliably. Positions
+# there raise nothing.
+coast_margin_m = 500

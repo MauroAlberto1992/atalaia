@@ -18,9 +18,19 @@ from pydantic import BaseModel
 
 from minicop.alerts import Alert, AlertEngine, AlertKind
 from minicop.anomalies import AnomalyConfig, AnomalyDetector, load_anomaly_config
+from minicop.bathymetry import Bathymetry, load_bathymetry
 from minicop.config import Area, load_settings
+from minicop.context import ContextMonitor, load_context_config
 from minicop.coverage import CoverageConfig, CoverageMonitor, load_coverage_config
-from minicop.events import PositionEvent, SensorTick, Tick, Track, ZoneAdded, ZoneRemoved
+from minicop.events import (
+    AnyEvent,
+    SensorTick,
+    StaticEvent,
+    Tick,
+    Track,
+    ZoneAdded,
+    ZoneRemoved,
+)
 from minicop.fusion import DarkTrack, FusionEngine
 from minicop.history import HistoryPoint, HistoryStats
 from minicop.history_db import HistoryDB, ShipSeen, window_start
@@ -46,7 +56,7 @@ EVENT_QUEUE_SIZE = 10_000
 SWEEP_INTERVAL_S = 30
 
 # Positions from ingestion and clock ticks share one queue (single writer).
-EventQueue = asyncio.Queue[PositionEvent | Tick | SensorTick | ZoneAdded | ZoneRemoved]
+EventQueue = asyncio.Queue[AnyEvent]
 
 
 class RouteResponse(BaseModel):
@@ -72,6 +82,7 @@ async def run_state(
     hub: Hub,
     recorder: Recorder | None = None,
     sensor: "SimulatedSensor | None" = None,
+    context: ContextMonitor | None = None,
 ) -> None:
     """The only task that mutates the store, the alert engine and the anomaly detector.
     Publishes every change to the hub."""
@@ -83,7 +94,11 @@ async def run_state(
     while True:
         event = await events.get()
         try:
-            if isinstance(event, ZoneAdded):
+            if isinstance(event, StaticEvent):
+                updated = store.apply_static(event)
+                if updated is not None:
+                    hub.publish({"type": "track", "track": updated.model_dump(mode="json")})
+            elif isinstance(event, ZoneAdded):
                 engine.add_zone(event.zone, store.snapshot())
                 hub.publish({"type": "zones"})  # clients refetch GET /zones
             elif isinstance(event, ZoneRemoved):
@@ -110,6 +125,8 @@ async def run_state(
                         publish_alerts(engine.on_stale(current, event.now))
                 for removed in result.removed_tracks:
                     engine.on_removed(removed.mmsi)
+                    if context is not None:
+                        context.on_removed(removed.mmsi)
                     anomalies.on_removed(removed)
                     hub.publish({"type": "remove", "mmsi": removed.mmsi})
                 anomalies.on_tick(event.now)
@@ -123,6 +140,8 @@ async def run_state(
                     if recorder is not None:
                         recorder.enqueue(track)  # never waits (see recorder.py)
                     publish_alerts(engine.on_track(track))
+                    if context is not None:
+                        publish_alerts(context.on_track(track))
                     restored, in_gap = coverage.on_track(track)
                     publish_alerts(restored)
                     publish_alerts(
@@ -260,6 +279,7 @@ class Runtime:
     alerts: AlertEngine
     anomalies: AnomalyDetector
     coverage: CoverageMonitor
+    context: ContextMonitor
     recorder: Recorder | None  # None when DATABASE_URL is not set
     history_db: HistoryDB | None  # read side of the recorded history (phase 14)
     sensor: SimulatedSensor | None  # SIMULATED drone + fusion (phase 15), off by default
@@ -363,11 +383,27 @@ def create_app(
     coverage_config: CoverageConfig | None = None,
     simulated_sensor: bool | None = None,
     sensors_config: SensorsConfig | None = None,
+    bathymetry: Bathymetry | None | bool = True,
 ) -> FastAPI:
     """ingest=False skips aisstream (and the API key); tests feed
     app.state.runtime.events. zones defaults to config/zones.toml; tests pass their own."""
     # Alert zones from zones.toml, plus port areas from OpenStreetMap (ports.json).
     zone_list = load_zones() + load_ports() if zones is None else zones
+    # Phase 17a: bathymetry for the configured area (True = load the file for
+    # MINICOP_AREA if it exists; tests pass a Bathymetry, or None for none).
+    if bathymetry is True:
+        area_name = os.getenv("MINICOP_AREA", "algarve").strip()
+        bathy = load_bathymetry(area_name)
+        if bathy is None:
+            log.warning(
+                "No bathymetry for area '%s': depth and impossible-position checks are off. "
+                "Run: python scripts/fetch_bathymetry.py --area %s",
+                area_name,
+                area_name,
+            )
+    else:
+        bathy = bathymetry or None
+    context_cfg = load_context_config()
     anomaly_cfg = load_anomaly_config() if anomaly_config is None else anomaly_config
     coverage_cfg = load_coverage_config() if coverage_config is None else coverage_config
 
@@ -377,11 +413,12 @@ def create_app(
         alert_engine = AlertEngine(zone_list)
         rt = Runtime(
             events=asyncio.Queue(maxsize=EVENT_QUEUE_SIZE),
-            store=TrackStore(),
+            store=TrackStore(bathy),
             hub=Hub(),
             alerts=alert_engine,
             anomalies=AnomalyDetector(anomaly_cfg, zone_list, alert_engine),
             coverage=CoverageMonitor(coverage_cfg, alert_engine),
+            context=ContextMonitor(context_cfg, bathy, zone_list, alert_engine),
             recorder=_recorder_from_env(),
             history_db=_history_db_from_env(),
             sensor=_simulated_sensor(simulated_sensor, sensors_config),
@@ -400,6 +437,7 @@ def create_app(
                     rt.hub,
                     rt.recorder,
                     rt.sensor,
+                    rt.context,
                 )
             ),
             asyncio.create_task(run_clock(rt.events)),
@@ -439,6 +477,7 @@ def create_app(
             "positions_parsed": rt.status.positions,
             "positions_class_a": rt.status.positions_by_class["A"],
             "positions_class_b": rt.status.positions_by_class["B"],
+            "static_frames": rt.status.statics,
             "positions_accepted": rt.store.accepted,
             "rejected_out_of_order": rt.store.out_of_order,
             "rejected_jumps": rt.store.jumps_rejected,

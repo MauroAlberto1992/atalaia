@@ -92,6 +92,28 @@ class Bathymetry:
                 return int(rows[r][c])
         return None
 
+    def surroundings(self, lat: float, lon: float, radius_m: float) -> tuple[bool, bool]:
+        """(any land, any sea) among the cells within ~radius_m (a square of
+        cells around the point). Used to skip places too close to the coast for
+        a ~115 m grid to say anything."""
+        for h, rows in self._grids:
+            r = int((h["lat_top"] - lat) / h["cell_deg"])
+            c = int((lon - h["lon_left"]) / h["cell_deg"])
+            if not (0 <= r < len(rows) and 0 <= c < int(h["cols"])):
+                continue
+            cell_m = h["cell_deg"] * 111_320  # north-south size of a cell
+            n = max(1, round(radius_m / cell_m))
+            land = sea = False
+            for rr in range(max(0, r - n), min(len(rows), r + n + 1)):
+                row = rows[rr]
+                for cc in range(max(0, c - n), min(int(h["cols"]), c + n + 1)):
+                    if row[cc] == LAND:
+                        land = True
+                    else:
+                        sea = True
+            return land, sea
+        return False, False
+
     def covers(self, lat: float, lon: float) -> bool:
         return self._cell(lat, lon) is not None
 

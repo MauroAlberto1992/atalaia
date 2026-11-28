@@ -8,14 +8,19 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from minicop.events import PositionEvent, Track
+from minicop.bathymetry import Bathymetry
+from minicop.events import PositionEvent, StaticEvent, Track
 from minicop.history import AddResult, ShipHistory
+from minicop.ship_types import ship_type_label
 
 # Class A ships report every 2-10 s under way and every 3 min when moored,
 # so 10 min of silence is abnormal. After 1 h we forget the ship entirely,
 # otherwise memory would grow forever as ships pass through the area.
 STALE_AFTER = timedelta(minutes=10)
 REMOVE_AFTER = timedelta(minutes=60)
+# Static data can arrive before (or without) any position: keep at most this
+# many ships' static data, forgetting the oldest first.
+MAX_STATIC = 20_000
 
 
 @dataclass
@@ -25,9 +30,17 @@ class SweepResult:
     removed_tracks: list[Track] = field(default_factory=list)  # last known state
 
 
+@dataclass
+class StaticInfo:
+    ship_type: int | None = None
+    draught_m: float | None = None
+
+
 class TrackStore:
-    def __init__(self) -> None:
+    def __init__(self, bathymetry: Bathymetry | None = None) -> None:
         self._tracks: dict[int, Track] = {}
+        self._bathymetry = bathymetry
+        self._static: dict[int, StaticInfo] = {}
         self._history: dict[int, ShipHistory] = {}
         # Times of rejected position jumps per ship, for spoofing detection.
         self._jumps: dict[int, deque[datetime]] = {}
@@ -69,10 +82,46 @@ class TrackStore:
             sensor_seen=current.sensor_seen if current else None,
             distance_nm=stats.distance_nm,
             avg_speed_kn=stats.avg_speed_kn,
+            **self._context(event.mmsi, event.latitude, event.longitude),
         )
         self._tracks[event.mmsi] = track
         self.accepted += 1
         return track
+
+    def _context(self, mmsi: int, lat: float, lon: float) -> dict[str, object]:
+        """Declared static data and the depth here (phase 17a)."""
+        info = self._static.get(mmsi, StaticInfo())
+        return {
+            "ship_type": info.ship_type,
+            "ship_type_label": ship_type_label(info.ship_type),
+            "draught_m": info.draught_m,
+            "depth_m": self._bathymetry.depth_m(lat, lon) if self._bathymetry else None,
+        }
+
+    def apply_static(self, event: StaticEvent) -> Track | None:
+        """Remember a ship's declared type/draught. Returns the updated Track if
+        the ship is on the map and something changed, else None. A message
+        without a draught (Class B) does not erase a known one."""
+        info = self._static.pop(event.mmsi, StaticInfo())  # re-insert: newest last
+        new = StaticInfo(
+            ship_type=event.ship_type if event.ship_type is not None else info.ship_type,
+            draught_m=event.draught_m if event.draught_m is not None else info.draught_m,
+        )
+        self._static[event.mmsi] = new
+        while len(self._static) > MAX_STATIC:
+            del self._static[next(iter(self._static))]
+        track = self._tracks.get(event.mmsi)
+        if track is None or new == info:
+            return None
+        updated = track.model_copy(
+            update={
+                "ship_type": new.ship_type,
+                "ship_type_label": ship_type_label(new.ship_type),
+                "draught_m": new.draught_m,
+            }
+        )
+        self._tracks[event.mmsi] = updated
+        return updated
 
     def sweep(self, now: datetime) -> SweepResult:
         """Mark silent ships stale and remove long-silent ones (with their history).

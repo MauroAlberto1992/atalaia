@@ -11,8 +11,8 @@ from datetime import UTC, datetime
 from websockets.asyncio.client import connect
 
 from minicop.config import Settings
-from minicop.events import PositionEvent, SensorTick, Tick, ZoneAdded, ZoneRemoved
-from minicop.parsing import POSITION_TYPES, parse_event
+from minicop.events import AnyEvent, PositionEvent
+from minicop.parsing import POSITION_TYPES, STATIC_TYPES, parse_event, parse_static
 
 log = logging.getLogger(__name__)
 
@@ -57,19 +57,21 @@ class IngestStatus:
         self.frames = 0  # every frame received from aisstream
         self.positions = 0  # frames that parsed into a usable position
         self.positions_by_class: dict[str, int] = {"A": 0, "B": 0}
+        self.statics = 0  # static data frames with a ship type or draught (phase 17a)
 
 
 async def run_ingestion(
     settings: Settings,
-    events: "asyncio.Queue[PositionEvent | Tick | SensorTick | ZoneAdded | ZoneRemoved]",
+    events: "asyncio.Queue[AnyEvent]",
     status: IngestStatus,
 ) -> None:
     subscription = json.dumps(
         {
             "APIKey": settings.api_key,
             "BoundingBoxes": settings.area.boxes,
-            # Class A and Class B position messages (phase 13).
-            "FilterMessageTypes": list(POSITION_TYPES),
+            # Class A and Class B positions (phase 13), and static data:
+            # ship type and draught (phase 17a).
+            "FilterMessageTypes": [*POSITION_TYPES, *STATIC_TYPES],
         }
     )
     backoff = Backoff()
@@ -98,6 +100,11 @@ async def run_ingestion(
                         status.positions += 1
                         status.positions_by_class[event.ais_class] += 1
                         await events.put(event)
+                        continue
+                    static = parse_static(frame)
+                    if static:
+                        status.statics += 1
+                        await events.put(static)
         except asyncio.CancelledError:
             raise  # shutdown: don't swallow it
         except TimeoutError:

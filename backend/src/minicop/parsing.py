@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from pydantic import ValidationError
 
-from minicop.events import PositionEvent
+from minicop.events import PositionEvent, StaticEvent
 from minicop.models import AisEnvelope, PositionReport
 
 log = logging.getLogger(__name__)
@@ -23,6 +23,39 @@ POSITION_TYPES = {
     "StandardClassBPositionReport": "B",  # message 18
     "ExtendedClassBPositionReport": "B",  # message 19 (not seen in the captured sample)
 }
+
+
+# Static data (phase 17a). Field names checked on captured real frames in
+# tests/fixtures/captured/ (ShipStaticData_*.json, StaticDataReport_*.json).
+STATIC_TYPES = ("ShipStaticData", "StaticDataReport")
+
+
+def parse_static(raw: str | bytes) -> StaticEvent | None:
+    """Ship type and draught from a static message, or None if the frame is not
+    one or carries neither. Class B message 24 comes in two parts: part A
+    (PartNumber false) has only the name, part B has the ship type."""
+    try:
+        envelope = AisEnvelope.model_validate_json(raw)
+        if envelope.message_type not in STATIC_TYPES:
+            return None
+        body = envelope.message[envelope.message_type]
+        mmsi = int(body["UserID"])
+        if envelope.message_type == "ShipStaticData":
+            ship_type = int(body.get("Type") or 0) or None
+            # Metres in the captured frames (e.g. 10.6 for a cargo ship); 0 = not available.
+            draught = float(body.get("MaximumStaticDraught") or 0) or None
+        else:
+            part_b = body.get("ReportB") or {}
+            if not body.get("PartNumber") or not part_b.get("Valid"):
+                return None  # part A: name only
+            ship_type = int(part_b.get("ShipType") or 0) or None
+            draught = None
+    except (ValidationError, KeyError, TypeError, ValueError) as exc:
+        log.warning("Dropping malformed static frame: %s | frame: %.200s", exc, raw)
+        return None
+    if ship_type is None and draught is None:
+        return None
+    return StaticEvent(mmsi=mmsi, ship_type=ship_type, draught_m=draught)
 
 
 def parse_position(raw: str | bytes) -> PositionReport | None:

@@ -23,6 +23,15 @@ class PositionEvent(BaseModel):
     ais_class: str = "A"  # "A" (ships) or "B" (small craft)
 
 
+class StaticEvent(BaseModel):
+    """Declared ship data (phase 17a): AIS message 5 (Class A) or 24 part B
+    (Class B). Fields are None when the message does not carry them."""
+
+    mmsi: int
+    ship_type: int | None = None
+    draught_m: float | None = None  # Class A only; message 24 has no draught
+
+
 class Track(BaseModel):
     """Latest known state of one ship, plus route stats (phase 4).
     The route points themselves are served separately by /tracks/{mmsi}/history."""
@@ -40,6 +49,13 @@ class Track(BaseModel):
     # Last time a (simulated) sensor detection was associated with this AIS
     # track (phase 15): "AIS + sensor" while recent.
     sensor_seen: datetime | None = None
+    # Phase 17a: declared static data (None until received) and the sea depth
+    # at the current position (EMODnet; None on land, outside the grid, or
+    # when no bathymetry is configured).
+    ship_type: int | None = None
+    ship_type_label: str = ""
+    draught_m: float | None = None
+    depth_m: float | None = None
     stale: bool = False  # no report for STALE_AFTER (phase 5)
     distance_nm: float = 0.0  # over the stored history
     avg_speed_kn: float = 0.0
@@ -68,3 +84,7 @@ class ZoneRemoved(BaseModel):
     """An operator deleted a drawn area (phase 16)."""
 
     name: str
+
+
+# Everything the state task consumes from its single queue.
+AnyEvent = PositionEvent | StaticEvent | Tick | SensorTick | ZoneAdded | ZoneRemoved

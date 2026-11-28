@@ -33,16 +33,31 @@ from minicop.config import BACKEND_DIR, load_area
 BASE_URL = "https://downloads.emodnet-bathymetry.eu/v12"
 MARGIN_DEG = 0.05  # a little beyond the box, so ships at the edge still get a depth
 # Tiles of the DTM 2024 (from the EMODnet catalogue): name -> lon_min, lon_max, lat_min, lat_max.
-TILES = {"F3": (-16.252, -6.3729, 33.7479, 43.127)}
+# Only the tiles the configured areas need (mainland: F3; Madeira: G2+G3; Azores: F1+F2).
+TILES = {
+    "F1": (-36.0, -26.1229, 33.7479, 43.127),
+    "F2": (-26.127, -16.2479, 33.7479, 43.127),
+    "F3": (-16.252, -6.3729, 33.7479, 43.127),
+    "G2": (-26.127, -16.2479, 24.3729, 33.752),
+    "G3": (-16.252, -6.3729, 24.3729, 33.752),
+}
+
+Box = tuple[float, float, float, float]  # lat_min, lon_min, lat_max, lon_max
 
 
-def tile_for(lat_min: float, lon_min: float, lat_max: float, lon_max: float) -> str:
+def pieces(box: Box) -> list[tuple[str, Box]]:
+    """The tiles a box needs, each with the part of the box inside it (a box
+    can straddle two tiles: Madeira and the Azores do)."""
+    lat_min, lon_min, lat_max, lon_max = box
+    out = []
     for name, (w, e, s, n) in TILES.items():
-        if w <= lon_min and lon_max <= e and s <= lat_min and lat_max <= n:
-            return name
-    raise SystemExit(
-        f"No known tile covers {lat_min},{lon_min} - {lat_max},{lon_max}; add it to TILES"
-    )
+        part = (max(lat_min, s), max(lon_min, w), min(lat_max, n), min(lon_max, e))
+        if part[0] < part[2] and part[1] < part[3]:
+            out.append((name, part))
+    covered = sum((p[2] - p[0]) * (p[3] - p[1]) for _, p in out)
+    if covered < 0.999 * (lat_max - lat_min) * (lon_max - lon_min):
+        raise SystemExit(f"Box {box} is not fully covered by known tiles; add them to TILES")
+    return out
 
 
 def numbers(text: io.TextIOBase) -> Iterator[str]:
@@ -89,18 +104,18 @@ def main() -> None:
             lat_max + MARGIN_DEG,
             lon_max + MARGIN_DEG,
         )
-        tile = tile_for(*box)
-        url = f"{BASE_URL}/{tile}_2024.asc.zip"
-        print(f"Downloading {url} ...")
-        with urllib.request.urlopen(url, timeout=600) as r:  # ~200 MB
-            data = r.read()
-        with zipfile.ZipFile(io.BytesIO(data)) as z:
-            name = next(n for n in z.namelist() if n.endswith(".asc"))
-            with z.open(name) as f:
-                grid = cut(io.TextIOWrapper(f, encoding="ascii"), *box)
-        sea = sum(d is not None for row in grid.depths for d in row)
-        print(f"  {len(grid.depths)} x {len(grid.depths[0])} cells, {sea} at sea")
-        grids.append(grid)
+        for tile, part in pieces(box):
+            url = f"{BASE_URL}/{tile}_2024.asc.zip"
+            print(f"Downloading {url} (about 200 MB) ...")
+            with urllib.request.urlopen(url, timeout=900) as r:
+                data = r.read()
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                name = next(n for n in z.namelist() if n.endswith(".asc"))
+                with z.open(name) as f:
+                    grid = cut(io.TextIOWrapper(f, encoding="ascii"), *part)
+            sea = sum(d is not None for row in grid.depths for d in row)
+            print(f"  {tile}: {len(grid.depths)} x {len(grid.depths[0])} cells, {sea} at sea")
+            grids.append(grid)
     out: Path = BACKEND_DIR / "config" / "bathymetry" / f"{args.area}.bin.gz"
     write_grids(out, grids)
     print(f"Wrote {out} ({out.stat().st_size / 1e6:.2f} MB)")

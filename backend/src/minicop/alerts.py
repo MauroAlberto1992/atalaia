@@ -37,6 +37,8 @@ class AlertKind(StrEnum):
     DARK_VESSEL = "dark_vessel"
     # A confirmed dark contact inside an area that alerts on entry (phase 16).
     DARK_IN_ZONE = "dark_in_zone"
+    # Environmental context (context.py): a position the seabed says is wrong.
+    IMPOSSIBLE_POSITION = "impossible_position"
 
 
 class Alert(BaseModel):
