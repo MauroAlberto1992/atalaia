@@ -4,6 +4,7 @@ or capture real frames as test fixtures (phase 13).
 Run from backend/:
     python scripts/watch_positions.py              # print positions (Ctrl+C to stop)
     python scripts/watch_positions.py --save 5     # save 5 real frames per message type
+    python scripts/watch_positions.py --save 10 --static   # static data instead (phase 17a)
 
 --save writes raw frames to tests/fixtures/captured/<MessageType>_<n>.json and
 stops when every type has N frames, or after --minutes (default 20). Parsers
@@ -26,17 +27,22 @@ from minicop.parsing import parse_position
 
 AISSTREAM_URL = "wss://stream.aisstream.io/v0/stream"
 CAPTURE_TYPES = ["PositionReport", "StandardClassBPositionReport", "ExtendedClassBPositionReport"]
+# Phase 17a: ship type and draught. Class A: message 5; Class B: message 24.
+STATIC_TYPES = ["ShipStaticData", "StaticDataReport"]
 CAPTURE_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "captured"
 
 
-async def main(save: int, minutes: float) -> None:
+async def main(save: int, minutes: float, static: bool) -> None:
     settings = load_settings()
+    types = STATIC_TYPES if static else CAPTURE_TYPES
+    if static and not save:
+        raise SystemExit("--static only captures: use it with --save N")
     subscription = {
         "APIKey": settings.api_key,
         "BoundingBoxes": settings.area.boxes,
-        "FilterMessageTypes": CAPTURE_TYPES,
+        "FilterMessageTypes": types,
     }
-    saved: dict[str, int] = dict.fromkeys(CAPTURE_TYPES, 0)
+    saved: dict[str, int] = dict.fromkeys(types, 0)
     deadline = time.monotonic() + minutes * 60
     if save:
         CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
@@ -79,10 +85,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--save", type=int, default=0, help="frames to capture per message type")
     parser.add_argument("--minutes", type=float, default=20, help="stop capturing after this long")
+    parser.add_argument("--static", action="store_true", help="capture static data (type, draught)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     try:
-        asyncio.run(main(args.save, args.minutes))
+        asyncio.run(main(args.save, args.minutes, args.static))
     except KeyboardInterrupt:
         pass
     except ConfigError as exc:
