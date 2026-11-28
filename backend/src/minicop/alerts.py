@@ -20,6 +20,10 @@ from minicop.zones import Zone
 MAX_ALERTS = 200
 
 
+# AIS reports 102.3 kn (raw 1023) for "speed not available"; never a real speed.
+SOG_NOT_AVAILABLE = 102.2
+
+
 class AlertKind(StrEnum):
     ENTER = "enter"
     EXIT = "exit"
@@ -160,6 +164,7 @@ class AlertEngine:
                 zone.name in now_inside
                 and zone.max_speed_kn is not None
                 and track.sog > zone.max_speed_kn
+                and track.sog < SOG_NOT_AVAILABLE
                 and (track.mmsi, zone.name) not in self._speeding
             ):
                 self._speeding.add((track.mmsi, zone.name))

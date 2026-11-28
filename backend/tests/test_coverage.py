@@ -104,10 +104,85 @@ def test_ship_outside_any_gap_is_not_suppressed():
     assert alerts == [] and in_gap is False
 
 
-def test_gaps_are_forgotten_after_memory():
+def test_restored_gaps_are_forgotten_after_memory():
     mon = monitor()
     ships = cluster(4, timedelta(seconds=20))
     run_sweeps(mon, ships)
+    for t in ships[:2]:  # half back: restored
+        mon.on_track(t.model_copy(update={"last_seen": STALE_AT + timedelta(minutes=5)}))
     mon.on_tick(STALE_AT + timedelta(hours=CFG.gap_memory_h, minutes=10))
-    _, in_gap = mon.on_track(ships[0].model_copy(update={"last_seen": T0 + timedelta(hours=3)}))
+    _, in_gap = mon.on_track(ships[3].model_copy(update={"last_seen": T0 + timedelta(hours=3)}))
     assert in_gap is False
+
+
+def test_long_outage_is_still_one_gap_when_ships_return():
+    """Review fix: an unrestored gap is not forgotten at gap_memory_h, so a
+    3 h outage ends with "coverage restored", not one "reappeared" per ship."""
+    mon = monitor()
+    ships = cluster(4, timedelta(seconds=20))
+    run_sweeps(mon, ships)
+    back = STALE_AT + timedelta(hours=3)
+    mon.on_tick(back)
+    results = [mon.on_track(t.model_copy(update={"last_seen": back})) for t in ships]
+    assert all(in_gap for _, in_gap in results)
+    kinds = [a.kind for alerts, _ in results for a in alerts]
+    assert kinds == ["coverage_restored"]
+
+
+def test_open_gap_does_not_keep_absorbing_a_chain_of_ships():
+    """Review fix: the join window is fixed when the gap opens. Before, each
+    ship that joined pushed the window forward, so ships going silent one by
+    one, each within max_spread_s of the previous, all disappeared into the gap."""
+    mon = monitor()
+    run_sweeps(mon, cluster(4, timedelta(seconds=20)))  # cohort silent T0..T0+20 s
+    chain = [
+        track(50, TAGUS[0] + 0.01, TAGUS[1], T0 + timedelta(seconds=120)),  # within the window
+        track(51, TAGUS[0] + 0.02, TAGUS[1], T0 + timedelta(seconds=220)),  # only via the chain
+    ]
+    released = []
+    for t in chain:
+        stale_at = t.last_seen + timedelta(minutes=10)
+        mon.add_stale(t, stale_at)
+        _, r = mon.process(stale_at + timedelta(seconds=CFG.max_spread_s))
+        released += [x.mmsi for x in r]
+    assert released == [51]  # 50 joined the gap; 51 is judged on its own
+
+
+def test_a_returned_ship_is_not_in_the_gap_any_more():
+    """Review fix: in_gap only on a ship's first return; a later silence of
+    its own must not have its 'reappeared' suppressed."""
+    mon = monitor()
+    ships = cluster(4, timedelta(seconds=20))
+    run_sweeps(mon, ships)
+    first = ships[0].model_copy(update={"last_seen": STALE_AT + timedelta(minutes=5)})
+    assert mon.on_track(first)[1] is True
+    again = ships[0].model_copy(update={"last_seen": STALE_AT + timedelta(minutes=50)})
+    assert mon.on_track(again)[1] is False
+
+
+def test_second_gap_with_the_same_ships_is_restored_too():
+    """Review fix: a ship in two gaps (same receiver fails twice) counts as
+    returned in both."""
+    mon = monitor()
+    ships = cluster(4, timedelta(seconds=20))
+    run_sweeps(mon, ships)
+    back = STALE_AT + timedelta(minutes=5)
+    for t in ships:
+        mon.on_track(t.model_copy(update={"last_seen": back}))  # gap 1 restored
+    # Silent again together 40 min later: a second gap with the same ships.
+    later = [t.model_copy(update={"last_seen": t.last_seen + timedelta(minutes=40)}) for t in ships]
+    alerts2 = []
+    for k in range(10):
+        now = STALE_AT + timedelta(minutes=40, seconds=30 * k)
+        for t in later:
+            stale_at = t.last_seen + timedelta(minutes=10)
+            if now - timedelta(seconds=30) < stale_at <= now:
+                mon.add_stale(t, now)
+        a, _ = mon.process(now)
+        alerts2 += a
+    assert [a.kind for a in alerts2] == ["coverage_lost"]
+    back2 = STALE_AT + timedelta(minutes=55)
+    kinds = [
+        a.kind for t in later for a in mon.on_track(t.model_copy(update={"last_seen": back2}))[0]
+    ]
+    assert kinds == ["coverage_restored"]

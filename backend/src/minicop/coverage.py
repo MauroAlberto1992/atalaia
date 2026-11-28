@@ -28,6 +28,11 @@ from minicop.events import Track
 
 Region = tuple[int, int]
 
+# An unrestored gap is kept this long even past gap_memory_h: forgetting it at
+# 2 h turned a long outage back into one "reappeared" alert per ship, with no
+# "coverage restored" (found in review). Restored gaps go after gap_memory_h.
+MAX_OPEN_GAP = timedelta(hours=24)
+
 
 class CoverageConfig(BaseModel):
     min_ships: int
@@ -54,6 +59,10 @@ class CoverageGap:
     first_silent: datetime
     last_silent: datetime
     opened_at: datetime
+    # Ships can join only while silent no later than this: the opening cohort's
+    # last report + spread. Fixed at opening; it used to slide with every ship
+    # that joined, so an open gap kept absorbing ships (hiding real "dark" ones).
+    join_until: datetime
     returned: set[int] = field(default_factory=set)
     restored: bool = False
 
@@ -101,6 +110,7 @@ class CoverageMonitor:
                 first_silent=min(t.last_seen for t in cohort),
                 last_silent=max(t.last_seen for t in cohort),
                 opened_at=now,
+                join_until=max(t.last_seen for t in cohort) + spread,
             )
             self._gaps.append(gap)
             for t in cohort:
@@ -117,21 +127,28 @@ class CoverageMonitor:
         """A ship reported. Returns (alerts, in_gap): in_gap means its silence
         was a coverage gap, so a 'reappeared' alert must be suppressed."""
         self._pending.pop(track.mmsi, None)  # came back before being judged
+        alerts: list[Alert] = []
+        in_gap = False
+        # Every gap the ship belongs to (the same receiver can fail twice), but
+        # only on its FIRST return to each: once back, a later silence of its
+        # own is its own (found in review: in_gap stayed true for 2 h).
         for gap in self._gaps:
-            if track.mmsi not in gap.ships:
+            if track.mmsi not in gap.ships or track.mmsi in gap.returned:
                 continue
+            in_gap = True
             gap.returned.add(track.mmsi)
-            alerts: list[Alert] = []
             if not gap.restored and len(gap.returned) * 2 >= len(gap.ships):
                 gap.restored = True
                 alerts.append(self._restored_alert(gap, track))
-            return alerts, True
-        return [], False
+        return alerts, in_gap
 
     def on_tick(self, now: datetime) -> None:
-        """Forget gaps older than gap_memory_h (bounded memory)."""
-        cutoff = now - timedelta(hours=self.cfg.gap_memory_h)
-        self._gaps = [g for g in self._gaps if g.opened_at >= cutoff]
+        """Forget restored gaps older than gap_memory_h, and unrestored ones
+        older than MAX_OPEN_GAP (bounded memory)."""
+        memory = timedelta(hours=self.cfg.gap_memory_h)
+        self._gaps = [
+            g for g in self._gaps if now - g.opened_at < (memory if g.restored else MAX_OPEN_GAP)
+        ]
 
     # ---- helpers --------------------------------------------------------------
 
@@ -156,7 +173,7 @@ class CoverageMonitor:
             if (
                 not gap.restored
                 and gap.region == self.region_of(track)
-                and gap.first_silent - spread <= track.last_seen <= gap.last_silent + spread
+                and gap.first_silent - spread <= track.last_seen <= gap.join_until
             ):
                 return gap
         return None

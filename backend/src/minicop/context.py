@@ -33,28 +33,42 @@ def load_context_config(path: Path = DEFAULT_CONTEXT_FILE) -> ContextConfig:
         return ContextConfig(**tomllib.load(f))
 
 
-def impossible_reason(
+UNKNOWN = "unknown"  # can't tell here (outside the grid, port, coastal band, no draught)
+
+
+def judge(
     track: Track, bathymetry: Bathymetry, cfg: ContextConfig, ports: list[Zone]
 ) -> str | None:
-    """Why this position can't be right, or None (possible, or can't tell)."""
+    """A reason the position can't be right; None if it is plausible; or
+    UNKNOWN when this place (or a missing draught) doesn't allow a verdict."""
     lat, lon = track.latitude, track.longitude
     if not bathymetry.covers(lat, lon):
-        return None
+        return UNKNOWN
     if any(p.near(lat, lon, PORT_MARGIN_NM) for p in ports):
-        return None
+        return UNKNOWN
     land_near, sea_near = bathymetry.surroundings(lat, lon, cfg.coast_margin_m)
     if land_near and sea_near:
-        return None  # coastal band: the grid is too coarse here
+        return UNKNOWN  # coastal band: the grid is too coarse here
     if not sea_near:
         return f"position on land (no sea within {cfg.coast_margin_m:.0f} m)"
     depth = bathymetry.depth_m(lat, lon)
     draught = track.draught_m
-    if depth is not None and draught is not None and depth < draught + cfg.draught_margin_m:
+    if depth is None or draught is None:
+        return UNKNOWN
+    if depth < draught + cfg.draught_margin_m:
         return (
             f"sea depth ~{depth:.0f} m, declared draught {draught:.1f} m "
             f"(margin {cfg.draught_margin_m:g} m)"
         )
     return None
+
+
+def impossible_reason(
+    track: Track, bathymetry: Bathymetry, cfg: ContextConfig, ports: list[Zone]
+) -> str | None:
+    """Why this position can't be right, or None (possible, or can't tell)."""
+    verdict = judge(track, bathymetry, cfg, ports)
+    return None if verdict == UNKNOWN else verdict
 
 
 class ContextMonitor:
@@ -74,10 +88,12 @@ class ContextMonitor:
     def on_track(self, track: Track) -> list[Alert]:
         if self.bathymetry is None:
             return []
-        reason = impossible_reason(track, self.bathymetry, self.cfg, self._ports)
+        reason = judge(track, self.bathymetry, self.cfg, self._ports)
         if reason is None:
-            self._flagged.discard(track.mmsi)  # back to plausible: re-arm
+            self._flagged.discard(track.mmsi)  # plausible again: re-arm
             return []
+        if reason == UNKNOWN:
+            return []  # can't tell here: keep the episode as it is (review fix)
         if track.mmsi in self._flagged:
             return []
         self._flagged.add(track.mmsi)

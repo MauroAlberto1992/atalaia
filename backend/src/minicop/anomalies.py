@@ -307,4 +307,5 @@ class AnomalyDetector:
             true_heading=event.true_heading,
             navigational_status=event.navigational_status,
             last_seen=event.received_at,
+            ais_class=event.ais_class,  # a Class B craft was shown as Class A (review)
         )
